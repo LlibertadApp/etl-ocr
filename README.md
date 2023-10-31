@@ -21,4 +21,6 @@ serverless config credentials --provider aws --key <ACCESS KEY> --secret <SECRET
 
 ## Step 3:  Deploy
 
+```bash
 serverless deploy
+```
