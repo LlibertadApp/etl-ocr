@@ -158,3 +158,29 @@ cython_debug/
 #  and can be added to the global gitignore or merged into this file.  For a more nuclear
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
+
+# Node Ocr
+node-ocr/node_modules
+node-ocr/jspm_packages
+
+# Python Ocr
+# Distribution / packaging
+python-ocr/.Python
+python-ocr/env/
+python-ocr/build/
+python-ocr/develop-eggs/
+python-ocr/dist/
+python-ocr/downloads/
+python-ocr/eggs/
+python-ocr/.eggs/
+python-ocr/lib/
+python-ocr/lib64/
+python-ocr/parts/
+python-ocr/sdist/
+python-ocr/var/
+python-ocr/*.egg-info/
+python-ocr/.installed.cfg
+python-ocr/*.egg
+
+# Serverless directories
+.serverless

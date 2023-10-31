@@ -1,0 +1,15 @@
+org: msandacz
+app: aws-node-http-api-project
+service: aws-project
+#frameworkVersion: '3'
+
+provider:
+  name: aws
+
+functions:
+  api:
+    handler: node-ocr/index.handler
+    runtime: nodejs18.x
+  hello:
+    handler: python-ocr/handler.hello
+    runtime: python3.9
