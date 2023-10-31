@@ -1,5 +1,3 @@
-org: msandacz
-app: aws-node-http-api-project
 service: aws-project
 #frameworkVersion: '3'
 
