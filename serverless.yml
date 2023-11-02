@@ -1,0 +1,89 @@
+service: etl-ocr
+
+plugins:
+  - serverless-step-functions
+  - serverless-iam-roles-per-function
+  - serverless-dotenv-plugin
+package:
+  exclude:
+    - node_modules/**
+    - 'package.json'
+    - 'package-lock.json'
+  include:
+    - ../lambda/**
+
+custom:
+  stageName: ${opt:stage, 'dev'}
+  region: us-east-2
+  mainStateMachineName: ${self:service}-${self:custom.stageName}
+  retryMaxAttempts: 36
+  retryIntervalSeconds: 300
+  retryBackoffRate: 1
+  lambdaTimeout: 60
+  lambdaMemory: 128
+
+provider:
+  name: aws
+  region: ${self:custom.region}
+  stage: ${self:custom.stageName}
+  environment:
+    ENV: ${self:custom.stageName}
+    REGION: ${self:custom.region}
+  stackTags:
+    application: ${self:service}
+    application-family: etl
+    environment: ${self:custom.stageName}
+
+functions:
+  listS3Buckets:
+    runtime: python3.9
+    handler: lambda/list-s3-buckets/code/main.handler
+    timeout: ${self:custom.lambdaTimeout}
+    memorySize: ${self:custom.lambdaMemory}
+    iamRoleStatementsName: ${self:service}-${self:custom.stageName}-listS3Buckets
+    iamRoleStatements:
+      - Effect: "Allow"
+        Action:
+          - s3:List*
+        Resource:
+          - "*"
+
+stepFunctions:
+  stateMachines:
+    etl-ocr:
+      name: ${self:custom.mainStateMachineName}
+      definition:
+        Comment: This State Machine process images.
+        StartAt: Ejemplo de condicional
+        States:
+          Ejemplo de condicional:
+            Type: Choice
+            Choices:
+              - And:
+                - Variable: $.ID_DE_MESA
+                  IsPresent: true
+                - Variable: $.ID_DE_MESA
+                  IsNull: false
+                - Not:
+                    Variable: $.ID_DE_MESA
+                    StringEquals: ""
+                Next: List S3 Buckets
+            Default: Ejemplo de remapeo de variable
+          Ejemplo de remapeo de variable:
+            Type: Pass
+            InputPath: $.VARIABLE_AUXILIAR
+            ResultPath: $.ID_DE_MESA
+            Next: List S3 Buckets
+          List S3 Buckets:
+            Type: Task
+            Resource:
+              Fn::GetAtt: [listS3Buckets, Arn]
+            TimeoutSeconds: ${self:functions.listS3Buckets.timeout}
+            Parameters:
+              CADA_MESA_ID.$: $.ID_DE_MESA
+              # CADA_MESA_ID es como lo definí en la lambda, mientras que MESA_ID es como se nombró en la StepFunction
+            ResultPath: $.DATOS_MESA
+            Next: Final state
+          Final state:
+            Type: Succeed
+
