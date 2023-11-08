@@ -4,7 +4,7 @@ exports.handler = async function (event, context) {
     throw new Error("Invalid id");
   }
 
-  const fiscalData = {
+  let fiscalData = {
     isAvailable: false,
   };
 
