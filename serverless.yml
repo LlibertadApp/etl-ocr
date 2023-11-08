@@ -65,12 +65,12 @@ functions:
     timeout: ${self:custom.lambdaTimeout}
     memorySize: ${self:custom.lambdaMemory}
     iamRoleStatementsName: ${self:service}-${self:custom.stageName}-SaveImageToS3
-  GetProvisionalResults:
+  ProcessImageOCR:
     runtime: nodejs18.x
-    handler: lambda/GetProvisionalResults/main.handler
+    handler: lambda/ProcessImageOCR/main.handler
     timeout: ${self:custom.lambdaTimeout}
     memorySize: ${self:custom.lambdaMemory}
-    iamRoleStatementsName: ${self:service}-${self:custom.stageName}-GetProvisionalResults
+    iamRoleStatementsName: ${self:service}-${self:custom.stageName}-ProcessImageOCR
   DetectTextAwsTextract:
     runtime: nodejs18.x
     handler: lambda/DetectTextAwsTextract/main.handler
@@ -127,21 +127,73 @@ stepFunctions:
                   - Variable: $.fiscalData.conteoUp
                     NumericEqualsPath: $.govermentData.resultados.up.votos
                 Next: SaveRecordToDatabase
+            Default: SaveImageToS3
+          SaveImageToS3:
+            Comment: Descarga la imagen desde los resultados provisorios y la guarda en S3
+            Type: Task
+            Resource: !GetAtt SaveImageToS3.Arn
+            TimeoutSeconds: ${self:functions.SaveImageToS3.timeout}
+            Next: GetResultsFromApi
+          ProcessImageOCR:
+            Comment: Procesa la imagen con un OCR en el orden en que ha sido definidos por prioridad
+            Type: Task
+            Resource: !GetAtt ProcessImageOCR.Arn
+            TimeoutSeconds: ${self:functions.ProcessImageOCR.timeout}
+            Next: WereAllFieldsDetected
+          WereAllFieldsDetected:
+            Comment: ¿Se detectaron todos los campos del telegrama?
+            Type: Choice
+            Choices:
+              - And:
+                  - Variable: $.fiscalData.conteoLla
+                    NumericEqualsPath: $.govermentData.resultados.lla.votos
+                  - Variable: $.fiscalData.conteoUp
+                    NumericEqualsPath: $.govermentData.resultados.up.votos
+                Next: IsGovermentOcrEqualsToGovermentAPI
+            Default: DoWeHaveMoreOCRAvailable
+          DoWeHaveMoreOCRAvailable:
+            Comment: ¿Tenemos algun otro OCR disponible?
+            Type: Choice
+            Choices:
+              - And:
+                  - Variable: $.fiscalData.conteoLla
+                    NumericEqualsPath: $.govermentData.resultados.lla.votos
+                  - Variable: $.fiscalData.conteoUp
+                    NumericEqualsPath: $.govermentData.resultados.up.votos
+                Next: ProcessImageOCR
+            Default: SaveRecordToDatabase
+          IsGovermentOcrEqualsToGovermentAPI:
+            Comment: ¿Los datos extraidos del telegrama (gob) es igual a los datos publicados en resultados?
+            Type: Choice
+            Choices:
+              - And:
+                  - Variable: $.fiscalData.conteoLla
+                    NumericEqualsPath: $.govermentData.resultados.lla.votos
+                  - Variable: $.fiscalData.conteoUp
+                    NumericEqualsPath: $.govermentData.resultados.up.votos
+                Next: DoWeHaveFiscalData2
+            # Fraude (incongruencia en datos escaneados vs. publicados)
+            Default: SaveRecordToDatabase
+          DoWeHaveFiscalData2:
+            Comment: ¿Tenemos data del fiscal recibida (2)?
+            Type: Choice
+            Choices:
+              - Variable: $.fiscalData.isAvailable
+                BooleanEquals: true
+                # posible falla en datos ingresados por fiscal (america verificacion manual)
+                Next: SaveRecordToDatabase
+              - Variable: $.fiscalData.isAvailable
+                BooleanEquals: false
+                # No tenemos forma de validar la incongruencia
+                Next: SaveRecordToDatabase
           SaveRecordToDatabase:
             Comment: Guarda el resultado final del procesamiento de la mesa en db
             Type: Task
             Resource: !GetAtt SaveRecordToDatabase.Arn
             TimeoutSeconds: ${self:functions.SaveRecordToDatabase.timeout}
             Next: Succeed
-
-          # SaveImageToS3:
-          #   Comment: Descarga la imagen desde los resultados provisorios y la guarda en S3
-          #   Type: Task
-          #   Resource: !GetAtt SaveImageToS3.Arn
-          #   TimeoutSeconds: ${self:functions.SaveImageToS3.timeout}
-          #   Next: GetProvisionalResults
           # DetectTextAwsTextract:
-          #   Comment: AWS Textract OCR para extraer los datos desde un telegrama cargado en api provosorios
+          #   Comment: Hace uso de AWS Textract OCR para extraer los datos desde una imagen de telegrama
           #   Type: Task
           #   Resource: !GetAtt DetectTextAwsTextract.Arn
           #   TimeoutSeconds: ${self:functions.DetectTextAwsTextract.timeout}

@@ -22,4 +22,6 @@ exports.handler = async function (event, context) {
   };
   const bucket = new AWS.S3();
   await bucket.putObject(opts).promise();
+
+  return "path-to-s3";
 };
