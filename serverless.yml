@@ -35,42 +35,48 @@ provider:
     environment: ${self:custom.stageName}
 
 functions:
-  listS3Buckets:
-    runtime: python3.9
-    handler: lambda/list-s3-buckets/code/main.handler
+  ProcessId:
+    runtime: nodejs18.x
+    handler: lambda/ProcessId/main.handler
     timeout: ${self:custom.lambdaTimeout}
     memorySize: ${self:custom.lambdaMemory}
-    iamRoleStatementsName: ${self:service}-${self:custom.stageName}-listS3Buckets
-    iamRoleStatements:
-      - Effect: "Allow"
-        Action:
-          - s3:List*
-        Resource:
-          - "*"
-  getResultados:
-    runtime: node18.x
-    handler: lambda/getResultados/main.handler
+    iamRoleStatementsName: ${self:service}-${self:custom.stageName}-ProcessId
+  GetResultsFromApi:
+    runtime: nodejs18.x
+    handler: lambda/GetResultsFromApi/main.handler
     timeout: ${self:custom.lambdaTimeout}
     memorySize: ${self:custom.lambdaMemory}
-    iamRoleStatementsName: ${self:service}-${self:custom.stageName}-listS3Buckets
-    iamRoleStatements:
-      - Effect: "Allow"
-        Action:
-          - s3:List*
-        Resource:
-          - "*"
-  extractDataWithAWSTextract:
-    runtime: node18.x
-    handler: lambda/ocrs/awsTextract/main.handler
+    iamRoleStatementsName: ${self:service}-${self:custom.stageName}-GetResultsFromApi
+  QueryFiscalPayload:
+    runtime: nodejs18.x
+    handler: lambda/QueryFiscalPayload/main.handler
     timeout: ${self:custom.lambdaTimeout}
     memorySize: ${self:custom.lambdaMemory}
-    iamRoleStatementsName: ${self:service}-${self:custom.stageName}-listS3Buckets
-    iamRoleStatements:
-      - Effect: "Allow"
-        Action:
-          - s3:List*
-        Resource:
-          - "*"
+    iamRoleStatementsName: ${self:service}-${self:custom.stageName}-QueryFiscalPayload
+  SaveRecordToDatabase:
+    runtime: nodejs18.x
+    handler: lambda/SaveRecordToDatabase/main.handler
+    timeout: ${self:custom.lambdaTimeout}
+    memorySize: ${self:custom.lambdaMemory}
+    iamRoleStatementsName: ${self:service}-${self:custom.stageName}-SaveRecordToDatabase
+  SaveImageToS3:
+    runtime: nodejs18.x
+    handler: lambda/SaveImageToS3/main.handler
+    timeout: ${self:custom.lambdaTimeout}
+    memorySize: ${self:custom.lambdaMemory}
+    iamRoleStatementsName: ${self:service}-${self:custom.stageName}-SaveImageToS3
+  GetProvisionalResults:
+    runtime: nodejs18.x
+    handler: lambda/GetProvisionalResults/main.handler
+    timeout: ${self:custom.lambdaTimeout}
+    memorySize: ${self:custom.lambdaMemory}
+    iamRoleStatementsName: ${self:service}-${self:custom.stageName}-GetProvisionalResults
+  DetectTextAwsTextract:
+    runtime: nodejs18.x
+    handler: lambda/DetectTextAwsTextract/main.handler
+    timeout: ${self:custom.lambdaTimeout}
+    memorySize: ${self:custom.lambdaMemory}
+    iamRoleStatementsName: ${self:service}-${self:custom.stageName}-DetectTextAwsTextract
 
 stepFunctions:
   stateMachines:
@@ -78,50 +84,65 @@ stepFunctions:
       name: ${self:custom.mainStateMachineName}
       definition:
         Comment: This State Machine process images.
-        StartAt: Ejemplo de condicional
+        StartAt: ProcessId
         States:
-          GET_RESULTADOS:
+          ProcessId:
+            Comment: Procesa y marca como procesado un id desde SQS (FIFO)
             Type: Task
-            Resource: !GetAtt getResultados.Arn
-            TimeoutSeconds: ${self:functions.listS3Buckets.timeout}
-            Parameters:
-              MESA_ID$: $.MESA_ID
-            ResultPath: $.DATOS_MESA
-            Next: INVOKE_AWS_TEXTRACT
-          INVOKE_AWS_TEXTRACT:
+            Resource: !GetAtt ProcessId.Arn
+            TimeoutSeconds: ${self:functions.ProcessId.timeout}
+            Next: GetResultsFromApi
+          GetResultsFromApi:
+            Comment: Realiza un GET request hacia el api de resultados para obtener los resultados provisorios
             Type: Task
-            Resource: !GetAtt extractDataWithAWSTextract.Arn
-            TimeoutSeconds: ${self:functions.listS3Buckets.timeout}
-            Parameters:
-              DATOS_MESA$: $.DATOS_MESA
-            ResultPath: $.DATA_FROM_AWS_TEXTRACT
-            Next: SUCCEED
-          # Ejemplo de condicional:
-          #   Type: Choice
-          #   Choices:
-          #     - And:
-          #         - Variable: $.ID_DE_MESA
-          #           IsPresent: true
-          #         - Variable: $.ID_DE_MESA
-          #           IsNull: false
-          #         - Not:
-          #             Variable: $.ID_DE_MESA
-          #             StringEquals: ""
-          #       Next: List S3 Buckets
-          #   Default: Ejemplo de remapeo de variable
-          # Ejemplo de remapeo de variable:
-          #   Type: Pass
-          #   InputPath: $.VARIABLE_AUXILIAR
-          #   ResultPath: $.ID_DE_MESA
-          #   Next: List S3 Buckets
-          # List S3 Buckets:
+            Resource: !GetAtt GetResultsFromApi.Arn
+            TimeoutSeconds: ${self:functions.GetResultsFromApi.timeout}
+            Next: QueryFiscalPayload
+          QueryFiscalPayload:
+            Comment: Realiza una consulta a DAX (dynamodb) para cargar en memoria la data enviada por el fiscal para la mesa que esta siendo procesada
+            Type: Task
+            Resource: !GetAtt QueryFiscalPayload.Arn
+            TimeoutSeconds: ${self:functions.QueryFiscalPayload.timeout}
+            Next: DoWeHaveFiscalData
+          DoWeHaveFiscalData:
+            Comment: ¿Tenemos data del fiscal recibida?
+            Type: Choice
+            Choices:
+              - Variable: $.fiscalData.isAvailable
+                BooleanEquals: true
+                Next: IsFiscalDataEqualsToGovermentApiData
+              - Variable: $.fiscalData.isAvailable
+                BooleanEquals: false
+                Next: IsFiscalDataEqualsToGovermentApiData
+          IsFiscalDataEqualsToGovermentApiData:
+            Comment: ¿Es la data que cargo el fiscal igual a la cargada en API resultados?
+            Type: Choice
+            Choices:
+              - And:
+                  - Variable: $.fiscalData.conteoLla
+                    NumericEqualsPath: $.govermentData.resultados.lla.votos
+                  - Variable: $.fiscalData.conteoUp
+                    NumericEqualsPath: $.govermentData.resultados.up.votos
+                Next: SaveRecordToDatabase
+          SaveRecordToDatabase:
+            Comment: Guarda el resultado final del procesamiento de la mesa en db
+            Type: Task
+            Resource: !GetAtt SaveRecordToDatabase.Arn
+            TimeoutSeconds: ${self:functions.SaveRecordToDatabase.timeout}
+            Next: Succeed
+
+          # SaveImageToS3:
+          #   Comment: Descarga la imagen desde los resultados provisorios y la guarda en S3
           #   Type: Task
-          #   Resource:
-          #     Fn::GetAtt: [listS3Buckets, Arn]
-          #   TimeoutSeconds: ${self:functions.listS3Buckets.timeout}
-          #   Parameters:
-          #     CADA_MESA_ID.$: $.ID_DE_MESA
-          #   ResultPath: $.DATOS_MESA
-          #   Next: Final state
-          SUCCEED:
+          #   Resource: !GetAtt SaveImageToS3.Arn
+          #   TimeoutSeconds: ${self:functions.SaveImageToS3.timeout}
+          #   Next: GetProvisionalResults
+          # DetectTextAwsTextract:
+          #   Comment: AWS Textract OCR para extraer los datos desde un telegrama cargado en api provosorios
+          #   Type: Task
+          #   Resource: !GetAtt DetectTextAwsTextract.Arn
+          #   TimeoutSeconds: ${self:functions.DetectTextAwsTextract.timeout}
+          #   OutputPath: $.dataFromAwsTextract
+          #   Next: Succeed
+          Succeed:
             Type: Succeed

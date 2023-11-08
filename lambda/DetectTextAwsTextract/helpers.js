@@ -4,7 +4,7 @@ const {
   DetectDocumentTextCommand,
 } = require("@aws-sdk/client-textract");
 const pointInPolygon = require("point-in-polygon");
-const BOXES = require("./boxes");
+const polygons = require("./polygons");
 
 const downloadImage = async (url) => {
   try {
@@ -67,8 +67,8 @@ const extractText = async (buffer) => {
 };
 
 const isValueInsidePolygon = (fieldKey, points) => {
-  const boxes = BOXES[fieldKey];
-  for (const box of boxes) {
+  const polygons = polygons[fieldKey];
+  for (const box of polygons) {
     if (pointInPolygon(points, box)) {
       return true;
     }

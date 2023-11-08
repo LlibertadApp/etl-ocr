@@ -6,14 +6,15 @@ const {
 } = require("./helpers");
 
 exports.handler = async function (event, context) {
-  const { DATOS_MESA } = event;
-  const { id, resultados } = DATOS_MESA;
+  console.log(event);
+  const { id, resultados } = event;
   const response = {
     id,
     votosEnTotal: -1,
     votosImpugnados: -1,
     votosEnBlancos: -1,
     votosRecurridos: -1,
+    votosNulos: -1,
     conteo: {
       lla: -1,
       up: -1,
