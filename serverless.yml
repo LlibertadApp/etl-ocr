@@ -4,11 +4,15 @@ plugins:
   - serverless-step-functions
   - serverless-iam-roles-per-function
   - serverless-dotenv-plugin
+  - serverless-python-requirements
+  - serverless-prune-plugin
+
 package:
   exclude:
     - node_modules/**
     - "package.json"
     - "package-lock.json"
+    - venv/**
   include:
     - ../lambda/**
 
@@ -21,6 +25,11 @@ custom:
   retryBackoffRate: 1
   lambdaTimeout: 60
   lambdaMemory: 128
+  prune:
+    automatic: true
+    number: 3
+  pythonRequirements:
+    dockerizePip: non-linux
 
 provider:
   name: aws
@@ -60,7 +69,7 @@ functions:
     memorySize: ${self:custom.lambdaMemory}
     iamRoleStatementsName: ${self:service}-${self:custom.stageName}-SaveRecordToDatabase
   SaveImageToS3:
-    runtime: nodejs18.x
+    runtime: python3.11
     handler: lambda/SaveImageToS3/main.handler
     timeout: ${self:custom.lambdaTimeout}
     memorySize: ${self:custom.lambdaMemory}
