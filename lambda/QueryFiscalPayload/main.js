@@ -22,7 +22,5 @@ exports.handler = async function (event, context) {
     imagePath: "",
   });
 
-  return {
-    fiscalData,
-  };
+  return fiscalData;
 };

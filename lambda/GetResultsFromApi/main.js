@@ -13,16 +13,14 @@ exports.handler = async function (event, context) {
   const up = partidos.find((p) => p.code == "134");
 
   return {
-    govermentData: {
-      id,
-      resultados: {
-        lla,
-        up,
-      },
-      recurridos,
-      blancos,
-      impugnados,
-      nulos,
-    }
+    id,
+    resultados: {
+      lla,
+      up,
+    },
+    recurridos,
+    blancos,
+    impugnados,
+    nulos,
   };
 };

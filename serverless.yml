@@ -91,18 +91,21 @@ stepFunctions:
             Type: Task
             Resource: !GetAtt ProcessId.Arn
             TimeoutSeconds: ${self:functions.ProcessId.timeout}
+            ResultPath: $.id
             Next: GetResultsFromApi
           GetResultsFromApi:
             Comment: Realiza un GET request hacia el api de resultados para obtener los resultados provisorios
             Type: Task
             Resource: !GetAtt GetResultsFromApi.Arn
             TimeoutSeconds: ${self:functions.GetResultsFromApi.timeout}
+            ResultPath: $.govermentData
             Next: QueryFiscalPayload
           QueryFiscalPayload:
             Comment: Realiza una consulta a DAX (dynamodb) para cargar en memoria la data enviada por el fiscal para la mesa que esta siendo procesada
             Type: Task
             Resource: !GetAtt QueryFiscalPayload.Arn
             TimeoutSeconds: ${self:functions.QueryFiscalPayload.timeout}
+            ResultPath: $.fiscalData
             Next: DoWeHaveFiscalData
           DoWeHaveFiscalData:
             Comment: ¿Tenemos data del fiscal recibida?
