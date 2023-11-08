@@ -1,0 +1,11 @@
+{
+  "name": "aws-textract",
+  "author": "@snuffy",
+  "version": "1.0.0",
+  "description": "OCR que extrae datos de telegramas usando AWS Textract (detect API)",
+  "main": "handler.js",
+  "license": "MIT",
+  "dependencies": {
+    "point-in-polygon": "^1.1.0"
+  }
+}
