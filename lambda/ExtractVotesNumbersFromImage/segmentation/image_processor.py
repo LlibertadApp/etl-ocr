@@ -1,7 +1,6 @@
 import cv2
 import numpy as np
-
-from celda import Celda
+from segmentation.celda import Celda
 
 class ImageProcessor:
     def __init__(self, img_template, img):

@@ -1,5 +1,4 @@
-from tabla import Tabla
-
+from segmentation.tabla import Tabla
 
 class Template:
     def __init__(self, img, binarizada):

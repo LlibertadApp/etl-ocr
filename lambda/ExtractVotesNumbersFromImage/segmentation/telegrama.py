@@ -1,5 +1,4 @@
-from tabla import Tabla
-
+from segmentation.tabla import Tabla
 
 class Telegrama:
     def __init__(self, img, binarizada):

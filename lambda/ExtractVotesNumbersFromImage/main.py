@@ -11,6 +11,13 @@ from segmentation.image_processor import ImageProcessor
 from segmentation.telegrama_ballotage import TelegramaBallotage
 from segmentation.template_ballotage import TemplateBallotage
 
+'''
+{
+    code: "0200700636X",
+    image_path: "", # imagen del telegrama previamente guardada en s3
+    template_path: ""
+}
+'''
 def handler(event, context):
     KEY_TEMPLATE = "templates"
     KEY_TELEGRAMA_PATH = "telegramas"
@@ -27,34 +34,20 @@ def handler(event, context):
         
         # Obtener el path image_path
         image_path = event.get('image_path')
-        if not id:
+        if not image_path:
             raise ValueError("Invalid image_path")
         
         # Obtener el path template_path
         template_path = event.get('template_path')
-        if not id:
+        if not template_path:
             raise ValueError("Invalid template_path")
         
         bucket = os.environ['BUCKET_OCR_IMAGES']        
         if not bucket:
             raise ValueError("Invalid environ BUCKET_OCR_IMAGES")
         
-        endpoint = os.environ['BOI_ENDPOINT_URL']
-        access = os.environ['BOI_ACCESS']
-        secret = os.environ['BOI_SECRET']
-
-        if endpoint:
-            # Configura el cliente de S3 con tus credenciales y el endpoint de MinIO
-            s3_client = boto3.client('s3',
-                                    endpoint_url=endpoint,
-                                    aws_access_key_id=access,
-                                    aws_secret_access_key=secret,
-                                    region_name='us-east-1')
-        else:
-            # Inicializa el cliente de S3
-            s3_client = boto3.client('s3')
-
         # Obtener el objeto de S3
+        s3_client = boto3.client('s3', region_name=os.environ['AWS_REGION'])
         img = get_image_from_s3(s3_client, bucket, image_path)
         if img is None:
             raise ValueError("Failed to get image from S3.")
@@ -65,7 +58,6 @@ def handler(event, context):
         
         # Procesar la imagen
         processor = ImageProcessor(img_template, img)
-
         is_align = processor.read_and_align_images()
 
         aligned_binarizada = processor.binarize_aligned_image()
@@ -95,18 +87,16 @@ def handler(event, context):
             key_path_cell = f'{KEY_TELEGRAMA_PATH}/{KEY_CELDAS_PATH}/{code}_{KEY_CELDA_PATH}_{i}.png'
             upload_image_to_s3(s3_client, img, bucket, key_path_cell)
         
-        # Devolver una respuesta adecuada
         return {
-            'statusCode': 200,
-            'body': json.dumps('Image processed successfully!')
+            'processed': True
+            'path': 'extracted-url-in-s3'
         }
     except Exception as e:
         print(e)
         traceback.print_exc()
         error_trace = traceback.format_exc()
         return {
-            'statusCode': 500,
-            'body': json.dumps('Error processing the image'),
+            'processed': False,
             'error': str(e),
             'traceback': error_trace
         }

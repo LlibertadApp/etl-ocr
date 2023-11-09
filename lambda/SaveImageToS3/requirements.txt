@@ -1,4 +1,0 @@
-numpy
-opencv-python-headless
-boto3
-botocore
