@@ -1,14 +1,35 @@
 service: etl-ocr
 
+provider:
+  name: aws
+  region: ${self:custom.region}
+  stage: ${self:custom.stageName}
+  environment:
+    ENV: ${self:custom.stageName}
+    REGION: ${self:custom.region}
+  stackTags:
+    application: ${self:service}
+    application-family: etl
+    environment: ${self:custom.stageName}
+  ecr:
+    images:
+      extract-votes-numbers-from-image:
+        path: ./lambda/ExtractVotesNumbersFromImage
+
 plugins:
   - serverless-step-functions
   - serverless-iam-roles-per-function
   - serverless-dotenv-plugin
+  - serverless-python-requirements
+  - serverless-prune-plugin
+
 package:
+  individually: true
   exclude:
     - node_modules/**
     - "package.json"
     - "package-lock.json"
+    - venv/**
   include:
     - ../lambda/**
 
@@ -21,18 +42,9 @@ custom:
   retryBackoffRate: 1
   lambdaTimeout: 60
   lambdaMemory: 128
-
-provider:
-  name: aws
-  region: ${self:custom.region}
-  stage: ${self:custom.stageName}
-  environment:
-    ENV: ${self:custom.stageName}
-    REGION: ${self:custom.region}
-  stackTags:
-    application: ${self:service}
-    application-family: etl
-    environment: ${self:custom.stageName}
+  prune:
+    automatic: true
+    number: 3
 
 functions:
   ProcessId:
@@ -65,6 +77,13 @@ functions:
     timeout: ${self:custom.lambdaTimeout}
     memorySize: ${self:custom.lambdaMemory}
     iamRoleStatementsName: ${self:service}-${self:custom.stageName}-SaveImageToS3
+  ExtractVotesNumbersFromImage:
+    image:
+      name: extract-votes-numbers-from-image
+    timeout: ${self:custom.lambdaTimeout}
+    memorySize: ${self:custom.lambdaMemory}
+    iamRoleStatementsName: ${self:service}-${self:custom.stageName}-ExtractVotesNumbersFromImage
+    architecture: arm64
   ProcessImageOCR:
     runtime: nodejs18.x
     handler: lambda/ProcessImageOCR/main.handler
@@ -133,7 +152,15 @@ stepFunctions:
             Type: Task
             Resource: !GetAtt SaveImageToS3.Arn
             TimeoutSeconds: ${self:functions.SaveImageToS3.timeout}
-            Next: GetResultsFromApi
+            ResultPath: $.imagePath
+            Next: ExtractVotesNumbersFromImage
+          ExtractVotesNumbersFromImage:
+            Comment: Extrae unicamente la tabla de numeros del telegrama para facilitar el procesamiento OCRs
+            Type: Task
+            Resource: !GetAtt ExtractVotesNumbersFromImage.Arn
+            TimeoutSeconds: ${self:functions.ExtractVotesNumbersFromImage.timeout}
+            ResultPath: $.imagesExtracted
+            Next: ProcessImageOCR
           ProcessImageOCR:
             Comment: Procesa la imagen con un OCR en el orden en que ha sido definidos por prioridad
             Type: Task

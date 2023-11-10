@@ -12,10 +12,10 @@ exports.handler = async function (event, context) {
   const buffer = Buffer.from(encodingBinary, "base64");
   const firstPage = await sharp(buffer, { page: 0 }).toBuffer();
 
-  const asset = `actas/${mesaId}.jpeg`;
+  const path = `actas/${mesaId}.jpeg`;
   const opts = {
     Bucket: BUCKET_OCR_IMAGES,
-    Key: asset,
+    Key: path,
     ContentEncoding: "base64",
     Body: firstPage,
     ACL: "public-read",
@@ -23,5 +23,5 @@ exports.handler = async function (event, context) {
   const bucket = new AWS.S3();
   await bucket.putObject(opts).promise();
 
-  return "path-to-s3";
+  return `${BUCKET_OCR_IMAGES}.s3.amazonaws.com/${path}`;
 };
