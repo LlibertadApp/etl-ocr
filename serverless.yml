@@ -157,9 +157,9 @@ stepFunctions:
           ExtractVotesNumbersFromImage:
             Comment: Extrae unicamente la tabla de numeros del telegrama para facilitar el procesamiento OCRs
             Type: Task
-            Resource: !GetAtt ProcessImageOCR.Arn
-            TimeoutSeconds: ${self:functions.ProcessImageOCR.timeout}
-            ResultPath: $.imageExtracted
+            Resource: !GetAtt ExtractVotesNumbersFromImage.Arn
+            TimeoutSeconds: ${self:functions.ExtractVotesNumbersFromImage.timeout}
+            ResultPath: $.imagesExtracted
             Next: ProcessImageOCR
           ProcessImageOCR:
             Comment: Procesa la imagen con un OCR en el orden en que ha sido definidos por prioridad
