@@ -11,10 +11,10 @@ provider:
     application: ${self:service}
     application-family: etl
     environment: ${self:custom.stageName}
-  ecr:
-    images:
-      extract-votes-numbers-from-image:
-        path: ./lambda/ExtractVotesNumbersFromImage
+  # ecr:
+  #   images:
+  #     extract-votes-numbers-from-image:
+  #       path: ./lambda/ExtractVotesNumbersFromImage
 
 plugins:
   - serverless-step-functions
@@ -78,8 +78,9 @@ functions:
     memorySize: 1536
     iamRoleStatementsName: ${self:service}-${self:custom.stageName}-SaveImageToS3
   ExtractVotesNumbersFromImage:
-    image:
-      name: extract-votes-numbers-from-image
+    # image:
+    #   name: extract-votes-numbers-from-image
+    image: ${env:AWS_REGISTRY}/${env:ECR_REPOSITORY}:${env:IMAGE_TAG}
     timeout: ${self:custom.lambdaTimeout}
     memorySize: 2048
     iamRoleStatementsName: ${self:service}-${self:custom.stageName}-ExtractVotesNumbersFromImage

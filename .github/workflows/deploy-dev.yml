@@ -1,0 +1,77 @@
+name: Deploy develop branch
+
+on:
+  push:
+    branches:
+      - dev
+      - feat_cicd
+
+permissions:
+  id-token: write   # This is required for requesting the JWT
+  contents: read    # This is required for actions/checkout
+
+jobs:
+  deploy:
+    name: deploy
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [18.x]
+    steps:
+    - name: Git clone the repository
+      uses: actions/checkout@v3
+
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v3
+      with:
+        node-version: ${{ matrix.node-version }}
+
+    - name: Build .env with Python
+      run: |
+        VARIABLES_JSON='{
+          "BUCKET_OCR_IMAGES": "${{ vars.BUCKET_OCR_IMAGES }}",
+          "REGION": "${{ secrets.AWS_REGION }}",
+          "BUCKET_IMAGES": "${{ vars.BUCKET_IMAGES }}",
+          "TELEGRAMA_TEMPLATE_TO_USE": "${{ vars.TELEGRAMA_TEMPLATE_TO_USE }}"
+        }'
+        python3 dotEnvGenerator.py "$VARIABLES_JSON"
+        cat .env
+
+    - name: configure aws credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: arn:aws:iam::${{secrets.AWS_ACCOUNT_ID}}:role/${{vars.ROLE_TO_ASSUME}}
+        role-session-name: ${{ vars.ROLE_SESSION_NAME }}
+        aws-region: ${{ secrets.AWS_REGION }}
+
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v2
+
+    - name: Build, tag, and push docker image to Amazon ECR
+      env:
+        AWS_REGISTRY: ${{ vars.AWS_REGISTRY }}
+        ECR_REPOSITORY: extract-votes-numbers-from-image
+        IMAGE_TAG: ${{ vars.ENVIRONMENT }}_${{ github.run_id }}
+      run: |
+        docker build -t $AWS_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG lambda/ExtractVotesNumbersFromImage
+        docker push $AWS_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+
+    # - name: Test docker
+    #   run: |
+    #     docker --version
+
+
+
+
+    - name: Perform a Clean Install
+      run: npm install
+
+    - name: Deploy with Serverless Framework
+      uses: serverless/github-action@v3.2
+      with:
+        args: deploy --stage=dev
+      env:
+        AWS_REGISTRY: ${{ vars.AWS_REGISTRY }}
+        ECR_REPOSITORY: extract-votes-numbers-from-image
+        IMAGE_TAG: ${{ vars.ENVIRONMENT }}_${{ github.run_id }}
