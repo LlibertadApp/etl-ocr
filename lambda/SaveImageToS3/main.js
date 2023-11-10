@@ -1,5 +1,8 @@
+const sharp = require("sharp");
+const AWS = require("aws-sdk");
+
 exports.handler = async function (event, context) {
-  const { BUCKET_OCR_IMAGES } = process.env;
+  const { BUCKET_IMAGES } = process.env;
   const { id } = event;
   if (!id) {
     throw new Error("Invalid id");
@@ -12,9 +15,9 @@ exports.handler = async function (event, context) {
   const buffer = Buffer.from(encodingBinary, "base64");
   const firstPage = await sharp(buffer, { page: 0 }).toBuffer();
 
-  const path = `actas/${mesaId}.jpeg`;
+  const path = `actas/${id}.jpeg`;
   const opts = {
-    Bucket: BUCKET_OCR_IMAGES,
+    Bucket: BUCKET_IMAGES,
     Key: path,
     ContentEncoding: "base64",
     Body: firstPage,
@@ -23,5 +26,5 @@ exports.handler = async function (event, context) {
   const bucket = new AWS.S3();
   await bucket.putObject(opts).promise();
 
-  return `${BUCKET_OCR_IMAGES}.s3.amazonaws.com/${path}`;
+  return path;
 };

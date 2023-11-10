@@ -26,7 +26,6 @@ plugins:
 package:
   individually: true
   exclude:
-    - node_modules/**
     - "package.json"
     - "package-lock.json"
     - venv/**
@@ -45,6 +44,7 @@ custom:
   prune:
     automatic: true
     number: 3
+  ocrs_available: 0
 
 functions:
   ProcessId:
@@ -75,7 +75,7 @@ functions:
     runtime: nodejs18.x
     handler: lambda/SaveImageToS3/main.handler
     timeout: ${self:custom.lambdaTimeout}
-    memorySize: ${self:custom.lambdaMemory}
+    memorySize: 1536
     iamRoleStatementsName: ${self:service}-${self:custom.stageName}-SaveImageToS3
   ExtractVotesNumbersFromImage:
     image:
@@ -123,117 +123,160 @@ stepFunctions:
             Type: Task
             Resource: !GetAtt GetResultsFromApi.Arn
             TimeoutSeconds: ${self:functions.GetResultsFromApi.timeout}
-            ResultPath: $.govermentData
+            ResultPath: $.GetResultsFromApi
             Next: DeterminesTotalVotesSum
           DeterminesTotalVotesSum:
             Comment: Determina el total de la sumatoria de votos
             Type: Task
             Resource: !GetAtt DeterminesTotalVotesSum.Arn
             TimeoutSeconds: ${self:functions.DeterminesTotalVotesSum.timeout}
-            ResultPath: $.totalVotesSum
+            ResultPath: $.DeterminesTotalVotesSum
             Next: IsVotesSumEqualsToTotal
           IsVotesSumEqualsToTotal:
             Comment: ¿La sumatoria de todos los votos es igual al total de los votos?
             Type: Choice
             Choices:
-              - Variable: $.totalVotesSum.sum
-                NumericEqualsPath: $.totalVotesSum.total
+              - Variable: $.DeterminesTotalVotesSum.sum
+                NumericEqualsPath: $.DeterminesTotalVotesSum.total
                 Next: QueryFiscalPayload
-            Default: SaveRecordToDatabase
+            Default: SetStateToInconsistent
           QueryFiscalPayload:
             Comment: Realiza una consulta a DAX (dynamodb) para cargar en memoria la data enviada por el fiscal para la mesa que esta siendo procesada
             Type: Task
             Resource: !GetAtt QueryFiscalPayload.Arn
             TimeoutSeconds: ${self:functions.QueryFiscalPayload.timeout}
-            ResultPath: $.fiscalData
+            ResultPath: $.QueryFiscalPayload
             Next: DoWeHaveFiscalData
           DoWeHaveFiscalData:
             Comment: ¿Tenemos data del fiscal recibida?
             Type: Choice
             Choices:
-              - Variable: $.fiscalData.isAvailable
+              - Variable: $.QueryFiscalPayload.isAvailable
                 BooleanEquals: true
                 Next: IsFiscalDataEqualsToGovermentApiData
-              - Variable: $.fiscalData.isAvailable
+              - Variable: $.QueryFiscalPayload.isAvailable
                 BooleanEquals: false
-                Next: IsFiscalDataEqualsToGovermentApiData
+                Next: SaveImageToS3
           IsFiscalDataEqualsToGovermentApiData:
             Comment: ¿Es la data que cargo el fiscal igual a la cargada en API resultados?
             Type: Choice
             Choices:
               - And:
-                  - Variable: $.fiscalData.conteoLla
-                    NumericEqualsPath: $.govermentData.resultados.lla.votos
-                  - Variable: $.fiscalData.conteoUp
-                    NumericEqualsPath: $.govermentData.resultados.up.votos
-                Next: SaveRecordToDatabase
+                  - Variable: $.QueryFiscalPayload.conteoLla
+                    NumericEqualsPath: $.GetResultsFromApi.resultados.lla.votos
+                  - Variable: $.QueryFiscalPayload.conteoUp
+                    NumericEqualsPath: $.GetResultsFromApi.resultados.up.votos
+                Next: SetStateToMatch
             Default: SaveImageToS3
           SaveImageToS3:
             Comment: Descarga la imagen desde los resultados provisorios y la guarda en S3
             Type: Task
             Resource: !GetAtt SaveImageToS3.Arn
             TimeoutSeconds: ${self:functions.SaveImageToS3.timeout}
-            ResultPath: $.imagePath
+            ResultPath: $.SaveImageToS3
             Next: ExtractVotesNumbersFromImage
           ExtractVotesNumbersFromImage:
             Comment: Extrae unicamente la tabla de numeros del telegrama para facilitar el procesamiento OCRs
             Type: Task
             Resource: !GetAtt ExtractVotesNumbersFromImage.Arn
             TimeoutSeconds: ${self:functions.ExtractVotesNumbersFromImage.timeout}
-            ResultPath: $.imagesExtracted
+            ResultPath: $.ExtractVotesNumbersFromImage
+            Next: SetInitialOcrCount
+          SetInitialOcrCount:
+            Type: Pass
+            Result:
+              count: 0
+            ResultPath: $.ProcessImageOCR
             Next: ProcessImageOCR
           ProcessImageOCR:
             Comment: Procesa la imagen con un OCR en el orden en que ha sido definidos por prioridad
             Type: Task
             Resource: !GetAtt ProcessImageOCR.Arn
             TimeoutSeconds: ${self:functions.ProcessImageOCR.timeout}
-            Next: WereAllFieldsDetected
-          WereAllFieldsDetected:
+            ResultPath: $.ProcessImageOCR
+            Next: AreAllFieldsDetected
+          AreAllFieldsDetected:
             Comment: ¿Se detectaron todos los campos del telegrama?
             Type: Choice
             Choices:
-              - And:
-                  - Variable: $.fiscalData.conteoLla
-                    NumericEqualsPath: $.govermentData.resultados.lla.votos
-                  - Variable: $.fiscalData.conteoUp
-                    NumericEqualsPath: $.govermentData.resultados.up.votos
+              - Variable: $.ProcessImageOCR.completed
+                BooleanEquals: true
                 Next: IsGovermentOcrEqualsToGovermentAPI
             Default: DoWeHaveMoreOCRAvailable
           DoWeHaveMoreOCRAvailable:
             Comment: ¿Tenemos algun otro OCR disponible?
             Type: Choice
             Choices:
-              - And:
-                  - Variable: $.fiscalData.conteoLla
-                    NumericEqualsPath: $.govermentData.resultados.lla.votos
-                  - Variable: $.fiscalData.conteoUp
-                    NumericEqualsPath: $.govermentData.resultados.up.votos
-                Next: ProcessImageOCR
-            Default: SaveRecordToDatabase
+              - Variable: $.ProcessImageOCR.count
+                NumericEquals: ${self:custom.ocrs_available}
+                Next: SetStateToNotProcessed
+            Default: ProcessImageOCR
           IsGovermentOcrEqualsToGovermentAPI:
             Comment: ¿Los datos extraidos del telegrama (gob) es igual a los datos publicados en resultados?
             Type: Choice
             Choices:
               - And:
-                  - Variable: $.fiscalData.conteoLla
-                    NumericEqualsPath: $.govermentData.resultados.lla.votos
-                  - Variable: $.fiscalData.conteoUp
-                    NumericEqualsPath: $.govermentData.resultados.up.votos
+                  - Variable: $.QueryFiscalPayload.conteoLla
+                    NumericEqualsPath: $.GetResultsFromApi.resultados.lla.votos
+                  - Variable: $.QueryFiscalPayload.conteoUp
+                    NumericEqualsPath: $.GetResultsFromApi.resultados.up.votos
                 Next: DoWeHaveFiscalData2
-            # Fraude (incongruencia en datos escaneados vs. publicados)
-            Default: SaveRecordToDatabase
+            Default: SetStateToFraudDetected
           DoWeHaveFiscalData2:
             Comment: ¿Tenemos data del fiscal recibida (2)?
             Type: Choice
             Choices:
-              - Variable: $.fiscalData.isAvailable
+              - Variable: $.QueryFiscalPayload.isAvailable
                 BooleanEquals: true
                 # posible falla en datos ingresados por fiscal (america verificacion manual)
-                Next: SaveRecordToDatabase
-              - Variable: $.fiscalData.isAvailable
+                Next: SetStateToIncongruent
+              - Variable: $.QueryFiscalPayload.isAvailable
                 BooleanEquals: false
                 # No tenemos forma de validar la incongruencia
-                Next: SaveRecordToDatabase
+                Next: SetStateToInvalid
+
+          SetStateToIncongruent:
+            Comment: OCR gobierno es igual a datos publicados pero no es igual a lo que publico el fiscal
+            Type: Pass
+            Result:
+              state: INCONGRUENT
+            ResultPath: $.state
+            Next: SaveRecordToDatabase
+          SetStateToInvalid:
+            Comment: OCR gobierno es igual a datos publicados pero no tenemos datos del fiscal para comparar
+            Type: Pass
+            Result:
+              state: INVALID
+            ResultPath: $.state
+            Next: SaveRecordToDatabase
+          SetStateToFraudDetected:
+            Comment: El OCR del gobierno no coincide con los resultados publicados
+            Type: Pass
+            Result:
+              state: FRAUD_DETECTED
+            ResultPath: $.state
+            Next: SaveRecordToDatabase
+          SetStateToNotProcessed:
+            Comment: Los OCRs no pudieron extraer todos los numeros del telegrama
+            Type: Pass
+            Result:
+              state: NOT_PROCESSED
+            ResultPath: $.state
+            Next: SaveRecordToDatabase
+          SetStateToMatch:
+            Comment: Los numeros del fiscal coinciden a los resultados publicados
+            Type: Pass
+            Result:
+              state: MATCH
+            ResultPath: $.state
+            Next: SaveRecordToDatabase
+          SetStateToInconsistent:
+            Comment: La sumatoria total de votos no coincide con el total de votos
+            Type: Pass
+            Result:
+              state: INCONSISTENT
+            ResultPath: $.state
+            Next: SaveRecordToDatabase
           SaveRecordToDatabase:
             Comment: Guarda el resultado final del procesamiento de la mesa en db
             Type: Task

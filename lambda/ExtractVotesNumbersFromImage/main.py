@@ -13,9 +13,8 @@ from segmentation.template_ballotage import TemplateBallotage
 
 '''
 {
-    code: "0200700636X",
-    // imagen del telegrama previamente guardada en s3
-    image_path: "",
+    id: "0200700636X",
+    SaveImageToS3: "actas/0200700636X.jpeg",
 }
 '''
 def handler(event, context):
@@ -25,79 +24,69 @@ def handler(event, context):
     KEY_CELDAS_PATH = "votos_celdas"
     KEY_CELDA_PATH = "celda"
 
-    try:
-        # Obtener el path template_path
-        template_path = os.environ['TELEGRAMA_TEMPLATE_TO_USE']
-        if not template_path:
-            raise ValueError("Invalid envar TELEGRAMA_TEMPLATE_TO_USE")
-        
-        bucket = os.environ['BUCKET_IMAGES']        
-        if not bucket:
-            raise ValueError("Invalid envar BUCKET_IMAGES")
+    # Obtener el path template_path
+    template_path = os.environ['TELEGRAMA_TEMPLATE_TO_USE']
+    if not template_path:
+        raise ValueError("Invalid envar TELEGRAMA_TEMPLATE_TO_USE")
+    
+    bucket = os.environ['BUCKET_IMAGES']        
+    if not bucket:
+        raise ValueError("Invalid envar BUCKET_IMAGES")
 
-        # Obtener el id de la imagen desde el evento que activa la función
-        code = event.get('code')
-        if not code:
-            raise ValueError("Invalid code")
-        
-        # Obtener el path image_path
-        image_path = event.get('image_path')
-        if not image_path:
-            raise ValueError("Invalid image_path")
-        
-        # Obtener el objeto de S3
-        s3_client = boto3.client('s3', region_name=os.environ['REGION'])
-        img = get_image_from_s3(s3_client, bucket, image_path)
-        if img is None:
-            raise ValueError("Failed to get image from S3.")
-        
-        # procesa la imagen usando el template
-        img_template = read_image_from_path(template_path)
-        processor = ImageProcessor(img_template, img)
-        is_align = processor.read_and_align_images()
-        aligned_binarizada = processor.binarize_aligned_image()
-        template_binarizada = processor.binarize_template_image()
+    # Obtener el id de la imagen desde el evento que activa la función
+    id = event.get('id')
+    if not id:
+        raise ValueError("Invalid id")
+    
+    # Obtener el path image_path
+    image_path = event.get('SaveImageToS3')
+    if not image_path:
+        raise ValueError("Invalid imagePath")
+    
+    # Obtener el objeto de S3
+    s3_client = boto3.client('s3', region_name=os.environ['REGION'])
+    img = get_image_from_s3(s3_client, bucket, image_path)
+    if img is None:
+        raise ValueError("Failed to get image from S3.")
+    
+    # procesa la imagen usando el template
+    img_template = read_image_from_path(template_path)
+    processor = ImageProcessor(img_template, img)
+    is_align = processor.read_and_align_images()
+    aligned_binarizada = processor.binarize_aligned_image()
+    template_binarizada = processor.binarize_template_image()
 
-        # Crear instancias de Telegrama o Template con la imagen binarizada
-        telegrama = TelegramaBallotage(processor.aligned_image, aligned_binarizada)
-        template = TemplateBallotage(processor.img_template, template_binarizada)
+    # Crear instancias de Telegrama o Template con la imagen binarizada
+    telegrama = TelegramaBallotage(processor.aligned_image, aligned_binarizada)
+    template = TemplateBallotage(processor.img_template, template_binarizada)
 
-        # Procesa la tabla y recibe una lista de objetos Celda
-        celdas_procesadas = processor.process_table(template.tabla_grande.recorte)
+    # Procesa la tabla y recibe una lista de objetos Celda
+    celdas_procesadas = processor.process_table(template.tabla_grande.recorte)
 
-        # Lista de índices de las celdas que quieres extraer
-        indices_celdas_a_extraer = [30, 34, 36, 38, 40, 42, 44]
+    # Lista de índices de las celdas que quieres extraer
+    indices_celdas_a_extraer = [30, 34, 36, 38, 40, 42, 44]
 
-        # Imagen recortada que sera examinada por OCRs
-        img_celdas_combinada_extraidas = processor.combine_cells_by_id(celdas_procesadas, indices_celdas_a_extraer, telegrama.tabla_grande.recorte)
-        if img_celdas_combinada_extraidas is not None and isinstance(img_celdas_combinada_extraidas, np.ndarray):
-            key_path_column = f'{KEY_TELEGRAMA_PATH}/{KEY_COLUMNAS_PATH}/{code}.png'
-            upload_image_to_s3(s3_client, img_celdas_combinada_extraidas, bucket, key_path_column)
-        else:
-            print("No se pudo obtener la imagen combinada como un array de NumPy.")
+    # Imagen recortada que sera examinada por OCRs
+    img_celdas_combinada_extraidas = processor.combine_cells_by_id(celdas_procesadas, indices_celdas_a_extraer, telegrama.tabla_grande.recorte)
+    if img_celdas_combinada_extraidas is not None and isinstance(img_celdas_combinada_extraidas, np.ndarray):
+        key_path_column = f'{KEY_TELEGRAMA_PATH}/{KEY_COLUMNAS_PATH}/{id}.png'
+        upload_image_to_s3(s3_client, img_celdas_combinada_extraidas, bucket, key_path_column)
+    else:
+        print("No se pudo obtener la imagen combinada como un array de NumPy.")
 
-        # Imagenes de las celdas separadas usadas por el LLM
-        cells_images = []
-        img_celdas_extraidas = processor.extract_cells_by_id(celdas_procesadas, indices_celdas_a_extraer, telegrama.tabla_grande.recorte)
-        for i, (indice, img) in enumerate(img_celdas_extraidas):
-            key_path_cell = f'{KEY_TELEGRAMA_PATH}/{KEY_CELDAS_PATH}/{code}_{KEY_CELDA_PATH}_{i}.png'
-            upload_image_to_s3(s3_client, img, bucket, key_path_cell)
-            cells_images.append(key_path_cell)
-        
-        return {
-            'processed': True,
-            'image': f'{KEY_TELEGRAMA_PATH}/{KEY_COLUMNAS_PATH}/{code}.png',
-            'cells': cells_images
-        }
-    except Exception as e:
-        print(e)
-        traceback.print_exc()
-        error_trace = traceback.format_exc()
-        return {
-            'processed': False,
-            'error': str(e),
-            'traceback': error_trace
-        }
+    # Imagenes de las celdas separadas usadas por el LLM
+    cells_images = []
+    img_celdas_extraidas = processor.extract_cells_by_id(celdas_procesadas, indices_celdas_a_extraer, telegrama.tabla_grande.recorte)
+    for i, (indice, img) in enumerate(img_celdas_extraidas):
+        key_path_cell = f'{KEY_TELEGRAMA_PATH}/{KEY_CELDAS_PATH}/{id}_{KEY_CELDA_PATH}_{i}.png'
+        upload_image_to_s3(s3_client, img, bucket, key_path_cell)
+        cells_images.append(key_path_cell)
+    
+    return {
+        'image': f'{KEY_TELEGRAMA_PATH}/{KEY_COLUMNAS_PATH}/{id}.png',
+        'cells': cells_images
+    }
+
 
 def upload_image_to_s3(s3_client, image_array, bucket, key):
     # Asegurarse de que image_array es un array de NumPy y no None

@@ -18,10 +18,13 @@ exports.handler = async function (event, context) {
     sobres,
     totalVotos,
   } = scopeData;
+  const lla = partidos.find((p) => p.code == "135");
+  const up = partidos.find((p) => p.code == "134");
 
   return {
     id,
-    resultados: partidos,
+    partidos,
+    resultados: { lla, up },
     recurridos,
     blancos,
     impugnados,
