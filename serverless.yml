@@ -81,7 +81,7 @@ functions:
     image:
       name: extract-votes-numbers-from-image
     timeout: ${self:custom.lambdaTimeout}
-    memorySize: ${self:custom.lambdaMemory}
+    memorySize: 2048
     iamRoleStatementsName: ${self:service}-${self:custom.stageName}-ExtractVotesNumbersFromImage
     architecture: arm64
   ProcessImageOCR:
@@ -96,6 +96,12 @@ functions:
     timeout: ${self:custom.lambdaTimeout}
     memorySize: ${self:custom.lambdaMemory}
     iamRoleStatementsName: ${self:service}-${self:custom.stageName}-DetectTextAwsTextract
+  DeterminesTotalVotesSum:
+    runtime: nodejs18.x
+    handler: lambda/DeterminesTotalVotesSum/main.handler
+    timeout: ${self:custom.lambdaTimeout}
+    memorySize: ${self:custom.lambdaMemory}
+    iamRoleStatementsName: ${self:service}-${self:custom.stageName}-DeterminesTotalVotesSum
 
 stepFunctions:
   stateMachines:
@@ -118,7 +124,22 @@ stepFunctions:
             Resource: !GetAtt GetResultsFromApi.Arn
             TimeoutSeconds: ${self:functions.GetResultsFromApi.timeout}
             ResultPath: $.govermentData
-            Next: QueryFiscalPayload
+            Next: DeterminesTotalVotesSum
+          DeterminesTotalVotesSum:
+            Comment: Determina el total de la sumatoria de votos
+            Type: Task
+            Resource: !GetAtt DeterminesTotalVotesSum.Arn
+            TimeoutSeconds: ${self:functions.DeterminesTotalVotesSum.timeout}
+            ResultPath: $.totalVotesSum
+            Next: IsVotesSumEqualsToTotal
+          IsVotesSumEqualsToTotal:
+            Comment: ¿La sumatoria de todos los votos es igual al total de los votos?
+            Type: Choice
+            Choices:
+              - Variable: $.totalVotesSum.sum
+                NumericEqualsPath: $.totalVotesSum.total
+                Next: QueryFiscalPayload
+            Default: SaveRecordToDatabase
           QueryFiscalPayload:
             Comment: Realiza una consulta a DAX (dynamodb) para cargar en memoria la data enviada por el fiscal para la mesa que esta siendo procesada
             Type: Task
