@@ -44,7 +44,6 @@ custom:
   prune:
     automatic: true
     number: 3
-  ocrs_available: 0
 
 functions:
   ProcessId:
@@ -182,11 +181,19 @@ stepFunctions:
             Resource: !GetAtt ExtractVotesNumbersFromImage.Arn
             TimeoutSeconds: ${self:functions.ExtractVotesNumbersFromImage.timeout}
             ResultPath: $.ExtractVotesNumbersFromImage
-            Next: SetInitialOcrCount
-          SetInitialOcrCount:
+            Next: InitializeOcrProcess
+          InitializeOcrProcess:
             Type: Pass
             Result:
               count: 0
+              data:
+                lla: -1
+                up: -1
+                total: -1
+                blancos: -1
+                nulos: -1
+                impugnados: -1
+                recurridos: -1
             ResultPath: $.ProcessImageOCR
             Next: ProcessImageOCR
           ProcessImageOCR:
@@ -200,7 +207,7 @@ stepFunctions:
             Comment: ¿Se detectaron todos los campos del telegrama?
             Type: Choice
             Choices:
-              - Variable: $.ProcessImageOCR.completed
+              - Variable: $.ProcessImageOCR.extracted
                 BooleanEquals: true
                 Next: IsGovermentOcrEqualsToGovermentAPI
             Default: DoWeHaveMoreOCRAvailable
@@ -208,10 +215,10 @@ stepFunctions:
             Comment: ¿Tenemos algun otro OCR disponible?
             Type: Choice
             Choices:
-              - Variable: $.ProcessImageOCR.count
-                NumericEquals: ${self:custom.ocrs_available}
-                Next: SetStateToNotProcessed
-            Default: ProcessImageOCR
+              - Variable: $.ProcessImageOCR.wasted
+                BooleanEquals: false
+                Next: ProcessImageOCR
+            Default: SetStateToNotProcessed
           IsGovermentOcrEqualsToGovermentAPI:
             Comment: ¿Los datos extraidos del telegrama (gob) es igual a los datos publicados en resultados?
             Type: Choice
@@ -235,7 +242,13 @@ stepFunctions:
                 BooleanEquals: false
                 # No tenemos forma de validar la incongruencia
                 Next: SetStateToInvalid
-
+          # DetectTextAwsTextract:
+          #   Comment: Hace uso de AWS Textract OCR para extraer los datos desde una imagen de telegrama
+          #   Type: Task
+          #   Resource: !GetAtt DetectTextAwsTextract.Arn
+          #   TimeoutSeconds: ${self:functions.DetectTextAwsTextract.timeout}
+          #   OutputPath: $.dataFromAwsTextract
+          #   Next: Succeed
           SetStateToIncongruent:
             Comment: OCR gobierno es igual a datos publicados pero no es igual a lo que publico el fiscal
             Type: Pass
@@ -284,12 +297,5 @@ stepFunctions:
             Resource: !GetAtt SaveRecordToDatabase.Arn
             TimeoutSeconds: ${self:functions.SaveRecordToDatabase.timeout}
             Next: Succeed
-          # DetectTextAwsTextract:
-          #   Comment: Hace uso de AWS Textract OCR para extraer los datos desde una imagen de telegrama
-          #   Type: Task
-          #   Resource: !GetAtt DetectTextAwsTextract.Arn
-          #   TimeoutSeconds: ${self:functions.DetectTextAwsTextract.timeout}
-          #   OutputPath: $.dataFromAwsTextract
-          #   Next: Succeed
           Succeed:
             Type: Succeed
