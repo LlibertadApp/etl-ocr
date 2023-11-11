@@ -10,8 +10,8 @@ exports.handler = async function (event, context) {
 
   return {
     count: count + 1,
-    completed:
-      count == OCRS_AVAILABLE.length || checkIfWeExtractedAllFields(data),
+    extracted: checkIfWeExtractedAllFields(data),
+    wasted: count == OCRS_AVAILABLE.length - 1,
     data: Object.assign(data, extractedData),
   };
 };
