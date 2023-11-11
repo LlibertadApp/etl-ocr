@@ -1,11 +1,11 @@
 exports.handler = async function (event, context) {
-  const { govermentData } = event;
-  if (!govermentData) {
-    throw Error("Invalid govermentData");
+  const { GetResultsFromApi } = event;
+  if (!GetResultsFromApi) {
+    throw Error("Invalid GetResultsFromApi");
   }
 
   const {
-    resultados,
+    partidos,
     id,
     recurridos,
     blancos,
@@ -14,10 +14,10 @@ exports.handler = async function (event, context) {
     electores,
     sobres,
     totalVotos,
-  } = govermentData;
+  } = GetResultsFromApi;
 
   // sumatoria de votos de todos los partidos disponibles
-  const totalPartidos = resultados.reduce(
+  const totalPartidos = partidos.reduce(
     (accu, current) => accu + current.votos,
     0
   );
