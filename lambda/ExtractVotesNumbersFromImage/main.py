@@ -18,6 +18,7 @@ from segmentation.template_ballotage import TemplateBallotage
 }
 '''
 def handler(event, context):
+    DOMAIN_S3 = "https://s3.amazonaws.com"
     KEY_TEMPLATE = "templates"
     KEY_TELEGRAMA_PATH = "telegramas_procesados"
     KEY_COLUMNAS_PATH = "votos_columna"
@@ -69,8 +70,8 @@ def handler(event, context):
 
     # Imagen recortada que sera examinada por OCRs
     img_celdas_combinada_extraidas = processor.combine_cells_by_id(celdas_procesadas, indices_celdas_a_extraer, telegrama.tabla_grande.recorte)
+    key_path_column = f'{KEY_TELEGRAMA_PATH}/{KEY_COLUMNAS_PATH}/{id}.png'
     if img_celdas_combinada_extraidas is not None and isinstance(img_celdas_combinada_extraidas, np.ndarray):
-        key_path_column = f'{KEY_TELEGRAMA_PATH}/{KEY_COLUMNAS_PATH}/{id}.png'
         upload_image_to_s3(s3_client, img_celdas_combinada_extraidas, bucket, key_path_column)
     else:
         print("No se pudo obtener la imagen combinada como un array de NumPy.")
@@ -84,7 +85,7 @@ def handler(event, context):
         cells_images.append(key_path_cell)
     
     return {
-        'image': f'{KEY_TELEGRAMA_PATH}/{KEY_COLUMNAS_PATH}/{id}.png',
+        'image': f'{DOMAIN_S3}/{bucket}/{key_path_column}',
         'cells': cells_images
     }
 
@@ -137,7 +138,6 @@ def get_image_from_s3(s3_client, bucket, key):
     except Exception as e:
         print(f"Error getting image from S3: {str(e)}")
         return None
-
 
 def read_image_from_path(file_path):
     try:
