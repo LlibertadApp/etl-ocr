@@ -15,10 +15,11 @@ exports.handler = async function (event, context) {
   const buffer = Buffer.from(encodingBinary, "base64");
   const firstPage = await sharp(buffer, { page: 0 }).toBuffer();
 
-  const path = `actas/${id}.jpeg`;
+  const DOMAIN_S3 = "https://s3.amazonaws.com";
+  const key = `telegramas/${id}.jpeg`;
   const opts = {
     Bucket: BUCKET_IMAGES,
-    Key: path,
+    Key: key,
     ContentEncoding: "base64",
     Body: firstPage,
     ACL: "public-read",
@@ -26,5 +27,8 @@ exports.handler = async function (event, context) {
   const bucket = new AWS.S3();
   await bucket.putObject(opts).promise();
 
-  return path;
+  return {
+    key,
+    url: `${DOMAIN_S3}/${BUCKET_IMAGES}/${key}`,
+  };
 };

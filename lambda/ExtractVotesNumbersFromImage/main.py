@@ -19,7 +19,7 @@ from segmentation.template_ballotage import TemplateBallotage
 '''
 def handler(event, context):
     KEY_TEMPLATE = "templates"
-    KEY_TELEGRAMA_PATH = "imagenes_procesadas"
+    KEY_TELEGRAMA_PATH = "telegramas_procesados"
     KEY_COLUMNAS_PATH = "votos_columna"
     KEY_CELDAS_PATH = "votos_celdas"
     KEY_CELDA_PATH = "celda"
@@ -38,14 +38,15 @@ def handler(event, context):
     if not id:
         raise ValueError("Invalid id")
     
-    # Obtener el path image_path
-    image_path = event.get('SaveImageToS3')
-    if not image_path:
-        raise ValueError("Invalid imagePath")
+    # Obtener el key (s3) de la imagen
+    image = event.get('SaveImageToS3')
+    image_key = image['key']
+    if not image_key:
+        raise ValueError("Invalid SaveImageToS3.key")
     
     # Obtener el objeto de S3
     s3_client = boto3.client('s3', region_name=os.environ['REGION'])
-    img = get_image_from_s3(s3_client, bucket, image_path)
+    img = get_image_from_s3(s3_client, bucket, image_key)
     if img is None:
         raise ValueError("Failed to get image from S3.")
     
