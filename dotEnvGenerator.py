@@ -21,6 +21,7 @@ import json
 def main():
   # Obtain the JSON arg from the arguments:
   varsText = sys.argv[1]
+  print(varsText)
   varsJson = json.loads(varsText)
 
   # Open .env.example file and get existing values
