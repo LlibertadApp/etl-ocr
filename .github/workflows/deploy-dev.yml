@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - dev
-      - feat_cicd
 
 permissions:
   id-token: write # This is required for requesting the JWT
@@ -14,6 +13,7 @@ jobs:
   deploy:
     name: deploy
     runs-on: ubuntu-latest
+    environment: dev
     strategy:
       matrix:
         node-version: [18.x]
@@ -70,7 +70,7 @@ jobs:
       - name: Deploy with Serverless Framework
         uses: serverless/github-action@v3.2
         with:
-          args: deploy --stage=dev
+          args: deploy --stage=${{ vars.ENVIRONMENT }}
         env:
           AWS_REGISTRY: ${{ vars.AWS_REGISTRY }}
           ECR_REPOSITORY: extract-votes-numbers-from-image
