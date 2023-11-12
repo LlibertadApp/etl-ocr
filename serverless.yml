@@ -262,45 +262,45 @@ stepFunctions:
           #   OutputPath: $.dataFromAwsTextract
           #   Next: Succeed
           SetStateToIncongruent:
-            Comment: OCR gobierno es igual a datos publicados pero no es igual a lo que publico el fiscal
             Type: Pass
             Result:
               state: INCONGRUENT
+              message: OCR gobierno es igual a datos publicados pero no es igual a lo que publico el fiscal
             ResultPath: $.state
             Next: SaveRecordToDatabase
           SetStateToInvalid:
-            Comment: OCR gobierno es igual a datos publicados pero no tenemos datos del fiscal para comparar
             Type: Pass
             Result:
               state: INVALID
+              message: OCR gobierno es igual a datos publicados pero no tenemos datos del fiscal para comparar
             ResultPath: $.state
             Next: SaveRecordToDatabase
           SetStateToFraudDetected:
-            Comment: El OCR del gobierno no coincide con los resultados publicados
             Type: Pass
             Result:
               state: FRAUD_DETECTED
+              message: El OCR del gobierno no coincide con los resultados publicados
             ResultPath: $.state
             Next: SaveRecordToDatabase
           SetStateToNotProcessed:
-            Comment: Los OCRs no pudieron extraer todos los numeros del telegrama
             Type: Pass
             Result:
               state: NOT_PROCESSED
+              message: Los OCRs no pudieron extraer todos los numeros del telegrama
             ResultPath: $.state
             Next: SaveRecordToDatabase
           SetStateToMatch:
-            Comment: Los numeros del fiscal coinciden a los resultados publicados
             Type: Pass
             Result:
               state: MATCH
+              message: Los numeros del fiscal coinciden a los resultados publicados
             ResultPath: $.state
             Next: SaveRecordToDatabase
           SetStateToInconsistent:
-            Comment: La sumatoria total de votos no coincide con el total de votos
             Type: Pass
             Result:
               state: INCONSISTENT
+              message: La sumatoria total de votos no coincide con el total de votos
             ResultPath: $.state
             Next: SaveRecordToDatabase
           SaveRecordToDatabase:

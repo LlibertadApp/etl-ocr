@@ -4,47 +4,27 @@
     "id": "0200700636X",
     "partidos": [
       {
-        "code": "135",
-        "name": "LA LIBERTAD AVANZA",
-        "codTel": "135",
-        "codLogo": "000135",
-        "votos": 70,
-        "perc": 27.14,
-        "percCarg": 27.14,
-        "cargos": 0,
-        "candidatos": ["JAVIER GERARDO MILEI", "VICTORIA VILLARRUEL"],
-        "listas": []
-      },
-      {
         "code": "134",
         "name": "UNION POR LA PATRIA",
-        "codTel": "134",
-        "codLogo": "000134",
-        "votos": 30,
-        "perc": 20.71,
-        "percCarg": 20.71,
-        "cargos": 0,
-        "candidatos": ["SERGIO TOMAS MASSA", "AGUSTIN ROSSI"],
-        "listas": []
+        "votos": 179
+      },
+      {
+        "code": "135",
+        "name": "LA LIBERTAD AVANZA",
+        "votos": 96
       }
     ],
-    "electores": 100,
-    "sobres": 100,
-    "totalVotos": 104,
     "resultados": {
-      "lla": {
-        "votos": 70
-      },
-      "up": { "votos": 30 }
+      "up": { "votos": 179 },
+      "lla": { "votos": 96 }
     },
-    "recurridos": 1,
-    "blancos": 1,
-    "impugnados": 1,
-    "nulos": 1
-  },
-  "DeterminesTotalVotesSum": {
-    "sum": 1290,
-    "total": 284
+    "nulos": 55,
+    "recurridos": 7,
+    "impugnados": 7,
+    "blancos": 94,
+    "totalVotos": 438,
+    "electores": 100,
+    "sobres": 100
   },
   "QueryFiscalPayload": {
     "isAvailable": false,
