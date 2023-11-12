@@ -1,12 +1,16 @@
+const { Lambda } = require("aws-sdk");
+
+// usar los nombres de lambda
 const OCR_KEYS = {
-  LLM: "llm",
+  // LLM: "llm",
+  AWS: "DetectTextAwsTextract",
 };
 
 exports.handler = async function (event, context) {
   const { ProcessImageOCR } = event;
   const { count, data } = ProcessImageOCR;
   const OCRS_AVAILABLE = [OCR_KEYS.LLM];
-  const extractedData = requestDataToOcr(OCRS_AVAILABLE[count]);
+  const extractedData = await requestDataToOcr(OCRS_AVAILABLE[count]);
 
   return {
     count: count + 1,
@@ -26,10 +30,14 @@ function checkIfWeExtractedAllFields(data) {
   return true;
 }
 
-function requestDataToOcr(ocr) {
-  switch (ocr) {
-    case OCR_KEYS.LLM: {
-      return {};
-    }
-  }
+async function requestDataToOcr(lambda) {
+  const extracted = await new Lambda()
+    .invoke({
+      FunctionName: lambda,
+      Payload: JSON.stringify({}),
+      InvocationType: "RequestResponse",
+    })
+    .promise();
+
+  return extracted;
 }

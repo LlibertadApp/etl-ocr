@@ -24,7 +24,7 @@ plugins:
   - serverless-prune-plugin
 
 package:
-  individually: true
+  individually: false
   exclude:
     - "package.json"
     - "package-lock.json"
@@ -96,6 +96,12 @@ functions:
     timeout: ${self:custom.lambdaTimeout}
     memorySize: ${self:custom.lambdaMemory}
     iamRoleStatementsName: ${self:service}-${self:custom.stageName}-DetectTextAwsTextract
+    iamRoleStatements:
+      - Effect: "Allow"
+        Action:
+          - textract:DetectDocumentText
+        Resource:
+          - "*"
   DeterminesTotalVotesSum:
     runtime: nodejs18.x
     handler: lambda/DeterminesTotalVotesSum/main.handler

@@ -12,7 +12,13 @@
     "serverless-step-functions": "^3.17.0"
   },
   "dependencies": {
+    "@aws-sdk/client-textract": "^3.449.0",
+    "@aws-sdk/credential-providers": "^3.449.0",
     "aws-sdk": "^2.1494.0",
+    "axios": "^1.6.1",
+    "node-fetch": "^3.3.2",
+    "point-in-polygon": "^1.1.0",
+    "point-in-polygon-hao": "^1.1.0",
     "sharp": "^0.32.6"
   }
 }
