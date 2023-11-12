@@ -22,7 +22,7 @@ exports.handler = async function (event, context) {
 
   return {
     count: count + 1,
-    extracted: checkIfWeExtractedAllFields(data),
+    extracted: checkIfWeExtractedAllFields(extractedData),
     wasted: count == OCRS_AVAILABLE.length - 1,
     data: Object.assign(data, extractedData),
   };

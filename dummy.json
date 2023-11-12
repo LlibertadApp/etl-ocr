@@ -8,7 +8,7 @@
         "name": "LA LIBERTAD AVANZA",
         "codTel": "135",
         "codLogo": "000135",
-        "votos": 76,
+        "votos": 70,
         "perc": 27.14,
         "percCarg": 27.14,
         "cargos": 0,
@@ -20,7 +20,7 @@
         "name": "UNION POR LA PATRIA",
         "codTel": "134",
         "codLogo": "000134",
-        "votos": 58,
+        "votos": 30,
         "perc": 20.71,
         "percCarg": 20.71,
         "cargos": 0,
@@ -28,20 +28,39 @@
         "listas": []
       }
     ],
-    "electores": 284,
-    "sobres": 284,
-    "totalVotos": 284,
+    "electores": 100,
+    "sobres": 100,
+    "totalVotos": 104,
     "resultados": {
-      "lla": 96,
-      "up": 179
+      "lla": {
+        "votos": 70
+      },
+      "up": { "votos": 30 }
     },
-    "recurridos": 7,
-    "blancos": 941,
-    "impugnados": 7,
-    "nulos": 55
+    "recurridos": 1,
+    "blancos": 1,
+    "impugnados": 1,
+    "nulos": 1
   },
   "DeterminesTotalVotesSum": {
     "sum": 1290,
     "total": 284
+  },
+  "QueryFiscalPayload": {
+    "isAvailable": false,
+    "mesaId": "",
+    "conteoLla": 0,
+    "conteoUp": 0,
+    "votosImpugnados": 0,
+    "votosNulos": 0,
+    "votosEnBlanco": 0,
+    "votosRecurridos": 0,
+    "votosEnTotal": 0,
+    "userId": "",
+    "imagePath": ""
+  },
+  "SaveImageToS3": {
+    "key": "dummy/mock_telegrama_0.jpg",
+    "url": "https://s3.amazonaws.com/test.ocrs/dummy/mock_telegrama_0.jpg"
   }
 }

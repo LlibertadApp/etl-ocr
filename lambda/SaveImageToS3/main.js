@@ -8,6 +8,11 @@ exports.handler = async function (event, context) {
     throw new Error("Invalid id");
   }
 
+  if (process.env.USE_DUMMY_FILE) {
+    const dummy = require("../../dummy.json");
+    return dummy.SaveImageToS3;
+  }
+
   const getTiff = await fetch(
     `https://resultados.gob.ar/backend-difu/scope/data/getTiff/${id}`
   );
@@ -26,11 +31,6 @@ exports.handler = async function (event, context) {
   };
   const bucket = new AWS.S3();
   await bucket.putObject(opts).promise();
-
-  if (process.env.USE_DUMMY_FILE) {
-    const dummy = require("../../dummy.json");
-    return dummy.SaveImageToS3;
-  }
 
   return {
     key,
