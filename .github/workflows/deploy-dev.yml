@@ -37,7 +37,7 @@ jobs:
           python3 dotEnvGenerator.py "$VARIABLES_JSON"
           cat .env
 
-      - name: configure aws credentials
+      - name: Configure aws credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::${{secrets.AWS_ACCOUNT_ID}}:role/${{vars.ROLE_TO_ASSUME}}
@@ -62,7 +62,10 @@ jobs:
       #     docker --version
 
       - name: Perform a Clean Install
-        run: npm install
+        run: |
+          npm install
+          rm -rf node_modules/sharp
+          SHARP_IGNORE_GLOBAL_LIBVIPS=1 npm install --arch=x64 --platform=linux --libc=glibc sharp
 
       - name: Deploy with Serverless Framework
         uses: serverless/github-action@v3.2
