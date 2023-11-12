@@ -21,6 +21,11 @@ exports.handler = async function (event, context) {
   const lla = partidos.find((p) => p.code == "135");
   const up = partidos.find((p) => p.code == "134");
 
+  if (process.env.USE_DUMMY_FILE) {
+    const dummy = require("../../dummy.json");
+    return dummy.GetResultsFromApi;
+  }
+
   return {
     id,
     partidos,

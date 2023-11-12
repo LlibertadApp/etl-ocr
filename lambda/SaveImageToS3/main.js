@@ -27,6 +27,11 @@ exports.handler = async function (event, context) {
   const bucket = new AWS.S3();
   await bucket.putObject(opts).promise();
 
+  if (process.env.USE_DUMMY_FILE) {
+    const dummy = require("../../dummy.json");
+    return dummy.SaveImageToS3;
+  }
+
   return {
     key,
     url: `${DOMAIN_S3}/${BUCKET_IMAGES}/${key}`,
