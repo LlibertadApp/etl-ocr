@@ -31,6 +31,7 @@ jobs:
           VARIABLES_JSON='{
             "REGION": "${{ secrets.AWS_REGION }}",
             "REGION": "${{ secrets.AWS_REGION }}",
+            "BUCKET_IMAGES": "${{ vars.BUCKET_IMAGES }}",
             "USE_DUMMY_FILE": "${{ vars.USE_DUMMY_FILE }}",
             "TELEGRAMA_TEMPLATE_TO_USE": "${{ vars.TELEGRAMA_TEMPLATE_TO_USE }}"
           }'
