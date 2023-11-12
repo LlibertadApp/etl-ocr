@@ -29,9 +29,9 @@ jobs:
       - name: Build .env with Python
         run: |
           VARIABLES_JSON='{
-            "BUCKET_OCR_IMAGES": "${{ vars.BUCKET_OCR_IMAGES }}",
             "REGION": "${{ secrets.AWS_REGION }}",
-            "BUCKET_IMAGES": "${{ vars.BUCKET_IMAGES }}",
+            "REGION": "${{ secrets.AWS_REGION }}",
+            "USE_DUMMY_FILE": "${{ vars.USE_DUMMY_FILE }}",
             "TELEGRAMA_TEMPLATE_TO_USE": "${{ vars.TELEGRAMA_TEMPLATE_TO_USE }}"
           }'
           python3 dotEnvGenerator.py "$VARIABLES_JSON"
