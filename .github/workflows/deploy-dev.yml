@@ -1,9 +1,9 @@
-name: Deploy develop branch
+name: Deploy dev branch
 
 on:
   push:
     branches:
-      - develop
+      - dev
       - feat_cicd
 
 permissions:
