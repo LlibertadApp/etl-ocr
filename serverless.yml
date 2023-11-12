@@ -90,6 +90,12 @@ functions:
     timeout: ${self:custom.lambdaTimeout}
     memorySize: ${self:custom.lambdaMemory}
     iamRoleStatementsName: ${self:service}-${self:custom.stageName}-ProcessImageOCR
+    iamRoleStatements:
+      - Effect: "Allow"
+        Action:
+          - lambda:InvokeFunction
+        Resource:
+          - "*"
   DetectTextAwsTextract:
     runtime: nodejs18.x
     handler: lambda/DetectTextAwsTextract/main.handler

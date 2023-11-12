@@ -68,8 +68,7 @@ const coords = {
 };
 
 exports.handler = async function (event, context) {
-  const { ExtractVotesNumbersFromImage } = event;
-  const { image } = ExtractVotesNumbersFromImage;
+  const { image } = event;
   const response = {
     up: -1,
     lla: -1,

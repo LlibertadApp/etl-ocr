@@ -7,10 +7,18 @@ const OCR_KEYS = {
 };
 
 exports.handler = async function (event, context) {
-  const { ProcessImageOCR } = event;
+  const { ProcessImageOCR, ExtractVotesNumbersFromImage } = event;
+  const { image, cells } = ExtractVotesNumbersFromImage;
   const { count, data } = ProcessImageOCR;
-  const OCRS_AVAILABLE = [OCR_KEYS.LLM];
-  const extractedData = await requestDataToOcr(OCRS_AVAILABLE[count]);
+  const OCRS_AVAILABLE = [
+    // OCR_KEYS.LLM,
+    OCR_KEYS.AWS,
+  ];
+  console.log(`Requesting OCR`, OCRS_AVAILABLE[count]);
+  const extractedData = await requestDataToOcr(OCRS_AVAILABLE[count], {
+    image,
+    cells,
+  });
 
   return {
     count: count + 1,
@@ -30,14 +38,15 @@ function checkIfWeExtractedAllFields(data) {
   return true;
 }
 
-async function requestDataToOcr(lambda) {
-  const extracted = await new Lambda()
+async function requestDataToOcr(functionName, payload) {
+  console.log("Calling function", functionName, payload);
+  const { Payload } = await new Lambda()
     .invoke({
-      FunctionName: lambda,
-      Payload: JSON.stringify({}),
+      FunctionName: `etl-ocr-${process.env.ENV}-${functionName}`,
+      Payload: JSON.stringify(payload),
       InvocationType: "RequestResponse",
     })
     .promise();
 
-  return extracted;
+  return JSON.parse(Payload);
 }
