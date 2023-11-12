@@ -4,6 +4,7 @@ const { Lambda } = require("aws-sdk");
 const OCR_KEYS = {
   // LLM: "llm",
   AWS: "DetectTextAwsTextract",
+  AZURE: "DetectTextAzureAI",
 };
 
 exports.handler = async function (event, context) {
@@ -13,6 +14,7 @@ exports.handler = async function (event, context) {
   const OCRS_AVAILABLE = [
     // OCR_KEYS.LLM,
     OCR_KEYS.AWS,
+    OCR_KEYS.AZURE,
   ];
   console.log(`Requesting OCR`, OCRS_AVAILABLE[count]);
   const extractedData = await requestDataToOcr(OCRS_AVAILABLE[count], {
