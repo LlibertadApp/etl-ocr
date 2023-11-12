@@ -31,8 +31,8 @@ jobs:
           VARIABLES_JSON='{
             "REGION": "${{ secrets.AWS_REGION }}",
             "BUCKET_IMAGES": "${{ vars.BUCKET_IMAGES }}",
-            "USE_DUMMY_FILE": "${{ vars.USE_DUMMY_FILE }}",
-            "TELEGRAMA_TEMPLATE_TO_USE": "${{ vars.TELEGRAMA_TEMPLATE_TO_USE }}"
+            "TELEGRAMA_TEMPLATE_TO_USE": "${{ vars.TELEGRAMA_TEMPLATE_TO_USE }}",
+            "USE_DUMMY_FILE": "${{ vars.USE_DUMMY_FILE }}"
           }'
           python3 dotEnvGenerator.py "$VARIABLES_JSON"
           cat .env
@@ -72,6 +72,7 @@ jobs:
         with:
           args: deploy --stage=${{ vars.ENVIRONMENT }}
         env:
+          AWS_REGION: ${{ secrets.AWS_REGION }}
           AWS_REGISTRY: ${{ vars.AWS_REGISTRY }}
           ECR_REPOSITORY: extract-votes-numbers-from-image
           IMAGE_TAG: ${{ vars.ENVIRONMENT }}_${{ github.run_id }}

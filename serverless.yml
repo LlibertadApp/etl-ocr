@@ -2,11 +2,11 @@ service: etl-ocr
 
 provider:
   name: aws
-  region: ${self:custom.region}
+  region: ${env:AWS_REGION}
   stage: ${self:custom.stageName}
   environment:
     ENV: ${self:custom.stageName}
-    REGION: ${self:custom.region}
+    REGION: ${env:AWS_REGION}
   stackTags:
     application: ${self:service}
     application-family: etl
@@ -34,7 +34,7 @@ package:
 
 custom:
   stageName: ${opt:stage, 'dev'}
-  region: us-east-2
+  region: ${env:AWS_REGION}
   mainStateMachineName: ${self:service}-${self:custom.stageName}
   retryMaxAttempts: 36
   retryIntervalSeconds: 300
