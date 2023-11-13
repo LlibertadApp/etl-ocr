@@ -114,6 +114,12 @@ functions:
     timeout: ${self:custom.lambdaTimeout}
     memorySize: ${self:custom.lambdaMemory}
     iamRoleStatementsName: ${self:service}-${self:custom.stageName}-DeterminesTotalVotesSum
+  DetectTextAzureAI:
+    runtime: nodejs18.x
+    handler: lambda/DetectTextAzureAI/main.handler
+    timeout: ${self:custom.lambdaTimeout}
+    memorySize: ${self:custom.lambdaMemory}
+    iamRoleStatementsName: ${self:service}-${self:custom.stageName}-DetectTextAzureAI
 
 stepFunctions:
   stateMachines:

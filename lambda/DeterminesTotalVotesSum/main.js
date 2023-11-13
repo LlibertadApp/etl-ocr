@@ -4,17 +4,8 @@ exports.handler = async function (event, context) {
     throw Error("Invalid GetResultsFromApi");
   }
 
-  const {
-    partidos,
-    id,
-    recurridos,
-    blancos,
-    impugnados,
-    nulos,
-    electores,
-    sobres,
-    totalVotos,
-  } = GetResultsFromApi;
+  const { partidos, recurridos, blancos, impugnados, nulos, totalVotos } =
+    GetResultsFromApi;
 
   // sumatoria de votos de todos los partidos disponibles
   const totalPartidos = partidos.reduce(
