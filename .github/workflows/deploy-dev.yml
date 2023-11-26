@@ -32,7 +32,10 @@ jobs:
             "REGION": "${{ secrets.AWS_REGION }}",
             "BUCKET_IMAGES": "${{ vars.BUCKET_IMAGES }}",
             "TELEGRAMA_TEMPLATE_TO_USE": "${{ vars.TELEGRAMA_TEMPLATE_TO_USE }}",
-            "USE_DUMMY_FILE": "${{ vars.USE_DUMMY_FILE }}"
+            "USE_DUMMY_FILE": "${{ vars.USE_DUMMY_FILE }}",
+            "AZURE_AI_ENDPOINT": "${{ secrets.AZURE_AI_ENDPOINT }}",
+            "AZURE_AI_KEY": "${{ secrets.AZURE_AI_KEY }}",
+            "AZURE_AI_MODEL_ID": "${{ secrets.AZURE_AI_MODEL_ID }}"            
           }'
           python3 dotEnvGenerator.py "$VARIABLES_JSON"
           cat .env
