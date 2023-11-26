@@ -1,0 +1,46 @@
+{
+  "id": "0200700636X",
+  "GetResultsFromApi": {
+    "id": "0200700636X",
+    "partidos": [
+      {
+        "code": "134",
+        "name": "UNION POR LA PATRIA",
+        "votos": 179
+      },
+      {
+        "code": "135",
+        "name": "LA LIBERTAD AVANZA",
+        "votos": 96
+      }
+    ],
+    "resultados": {
+      "up": { "votos": 179 },
+      "lla": { "votos": 96 }
+    },
+    "nulos": 55,
+    "recurridos": 7,
+    "impugnados": 7,
+    "blancos": 94,
+    "totalVotos": 438,
+    "electores": 100,
+    "sobres": 100
+  },
+  "QueryFiscalPayload": {
+    "isAvailable": false,
+    "mesaId": "",
+    "conteoLla": 0,
+    "conteoUp": 0,
+    "votosImpugnados": 0,
+    "votosNulos": 0,
+    "votosEnBlanco": 0,
+    "votosRecurridos": 0,
+    "votosEnTotal": 0,
+    "userId": "",
+    "imagePath": ""
+  },
+  "SaveImageToS3": {
+    "key": "dummy/mock_telegrama_0.jpg",
+    "url": "https://s3.amazonaws.com/test.ocrs/dummy/mock_telegrama_0.jpg"
+  }
+}

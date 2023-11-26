@@ -1,0 +1,319 @@
+service: etl-ocr
+
+provider:
+  name: aws
+  region: ${env:AWS_REGION}
+  stage: ${self:custom.stageName}
+  environment:
+    ENV: ${self:custom.stageName}
+    REGION: ${env:AWS_REGION}
+  stackTags:
+    application: ${self:service}
+    application-family: etl
+    environment: ${self:custom.stageName}
+  # ecr:
+  #   images:
+  #     extract-votes-numbers-from-image:
+  #       path: ./lambda/ExtractVotesNumbersFromImage
+
+plugins:
+  - serverless-step-functions
+  - serverless-iam-roles-per-function
+  - serverless-dotenv-plugin
+  - serverless-python-requirements
+  - serverless-prune-plugin
+
+package:
+  individually: false
+  exclude:
+    - "package.json"
+    - "package-lock.json"
+    - venv/**
+  include:
+    - ../lambda/**
+
+custom:
+  stageName: ${opt:stage, 'dev'}
+  region: ${env:AWS_REGION}
+  mainStateMachineName: ${self:service}-${self:custom.stageName}
+  retryMaxAttempts: 36
+  retryIntervalSeconds: 300
+  retryBackoffRate: 1
+  lambdaTimeout: 60
+  lambdaMemory: 128
+  prune:
+    automatic: true
+    number: 3
+
+functions:
+  ProcessId:
+    runtime: nodejs18.x
+    handler: lambda/ProcessId/main.handler
+    timeout: ${self:custom.lambdaTimeout}
+    memorySize: ${self:custom.lambdaMemory}
+    iamRoleStatementsName: ${self:service}-${self:custom.stageName}-ProcessId
+  GetResultsFromApi:
+    runtime: nodejs18.x
+    handler: lambda/GetResultsFromApi/main.handler
+    timeout: ${self:custom.lambdaTimeout}
+    memorySize: ${self:custom.lambdaMemory}
+    iamRoleStatementsName: ${self:service}-${self:custom.stageName}-GetResultsFromApi
+  QueryFiscalPayload:
+    runtime: nodejs18.x
+    handler: lambda/QueryFiscalPayload/main.handler
+    timeout: ${self:custom.lambdaTimeout}
+    memorySize: ${self:custom.lambdaMemory}
+    iamRoleStatementsName: ${self:service}-${self:custom.stageName}-QueryFiscalPayload
+  SaveRecordToDatabase:
+    runtime: nodejs18.x
+    handler: lambda/SaveRecordToDatabase/main.handler
+    timeout: ${self:custom.lambdaTimeout}
+    memorySize: ${self:custom.lambdaMemory}
+    iamRoleStatementsName: ${self:service}-${self:custom.stageName}-SaveRecordToDatabase
+  SaveImageToS3:
+    runtime: nodejs18.x
+    handler: lambda/SaveImageToS3/main.handler
+    timeout: ${self:custom.lambdaTimeout}
+    memorySize: 1536
+    iamRoleStatementsName: ${self:service}-${self:custom.stageName}-SaveImageToS3
+  ExtractVotesNumbersFromImage:
+    # image:
+    #   name: extract-votes-numbers-from-image
+    image: ${env:AWS_REGISTRY}/${env:ECR_REPOSITORY}:${env:IMAGE_TAG}
+    timeout: ${self:custom.lambdaTimeout}
+    memorySize: 2048
+    iamRoleStatementsName: ${self:service}-${self:custom.stageName}-ExtractVotesNumbersFromImage
+    architecture: arm64
+  ProcessImageOCR:
+    runtime: nodejs18.x
+    handler: lambda/ProcessImageOCR/main.handler
+    timeout: ${self:custom.lambdaTimeout}
+    memorySize: ${self:custom.lambdaMemory}
+    iamRoleStatementsName: ${self:service}-${self:custom.stageName}-ProcessImageOCR
+    iamRoleStatements:
+      - Effect: "Allow"
+        Action:
+          - lambda:InvokeFunction
+        Resource:
+          - "*"
+  DetectTextAwsTextract:
+    runtime: nodejs18.x
+    handler: lambda/DetectTextAwsTextract/main.handler
+    timeout: ${self:custom.lambdaTimeout}
+    memorySize: ${self:custom.lambdaMemory}
+    iamRoleStatementsName: ${self:service}-${self:custom.stageName}-DetectTextAwsTextract
+    iamRoleStatements:
+      - Effect: "Allow"
+        Action:
+          - textract:DetectDocumentText
+        Resource:
+          - "*"
+  DeterminesTotalVotesSum:
+    runtime: nodejs18.x
+    handler: lambda/DeterminesTotalVotesSum/main.handler
+    timeout: ${self:custom.lambdaTimeout}
+    memorySize: ${self:custom.lambdaMemory}
+    iamRoleStatementsName: ${self:service}-${self:custom.stageName}-DeterminesTotalVotesSum
+  DetectTextAzureAI:
+    runtime: nodejs18.x
+    handler: lambda/DetectTextAzureAI/main.handler
+    timeout: ${self:custom.lambdaTimeout}
+    memorySize: ${self:custom.lambdaMemory}
+    iamRoleStatementsName: ${self:service}-${self:custom.stageName}-DetectTextAzureAI
+
+stepFunctions:
+  stateMachines:
+    etl-ocr:
+      name: ${self:custom.mainStateMachineName}
+      definition:
+        Comment: This State Machine process images.
+        StartAt: ProcessId
+        States:
+          ProcessId:
+            Comment: Procesa y marca como procesado un id desde SQS (FIFO)
+            Type: Task
+            Resource: !GetAtt ProcessId.Arn
+            TimeoutSeconds: ${self:functions.ProcessId.timeout}
+            ResultPath: $.id
+            Next: GetResultsFromApi
+          GetResultsFromApi:
+            Comment: Realiza un GET request hacia el api de resultados para obtener los resultados provisorios
+            Type: Task
+            Resource: !GetAtt GetResultsFromApi.Arn
+            TimeoutSeconds: ${self:functions.GetResultsFromApi.timeout}
+            ResultPath: $.GetResultsFromApi
+            Next: DeterminesTotalVotesSum
+          DeterminesTotalVotesSum:
+            Comment: Determina el total de la sumatoria de votos
+            Type: Task
+            Resource: !GetAtt DeterminesTotalVotesSum.Arn
+            TimeoutSeconds: ${self:functions.DeterminesTotalVotesSum.timeout}
+            ResultPath: $.DeterminesTotalVotesSum
+            Next: IsVotesSumEqualsToTotal
+          IsVotesSumEqualsToTotal:
+            Comment: ¿La sumatoria de todos los votos es igual al total de los votos?
+            Type: Choice
+            Choices:
+              - Variable: $.DeterminesTotalVotesSum.sum
+                NumericEqualsPath: $.DeterminesTotalVotesSum.total
+                Next: QueryFiscalPayload
+            Default: SetStateToInconsistent
+          QueryFiscalPayload:
+            Comment: Realiza una consulta a DAX (dynamodb) para cargar en memoria la data enviada por el fiscal para la mesa que esta siendo procesada
+            Type: Task
+            Resource: !GetAtt QueryFiscalPayload.Arn
+            TimeoutSeconds: ${self:functions.QueryFiscalPayload.timeout}
+            ResultPath: $.QueryFiscalPayload
+            Next: DoWeHaveFiscalData
+          DoWeHaveFiscalData:
+            Comment: ¿Tenemos data del fiscal recibida?
+            Type: Choice
+            Choices:
+              - Variable: $.QueryFiscalPayload.isAvailable
+                BooleanEquals: true
+                Next: IsFiscalDataEqualsToGovermentApiData
+              - Variable: $.QueryFiscalPayload.isAvailable
+                BooleanEquals: false
+                Next: SaveImageToS3
+          IsFiscalDataEqualsToGovermentApiData:
+            Comment: ¿Es la data que cargo el fiscal igual a la cargada en API resultados?
+            Type: Choice
+            Choices:
+              - And:
+                  - Variable: $.QueryFiscalPayload.conteoLla
+                    NumericEqualsPath: $.GetResultsFromApi.resultados.lla.votos
+                  - Variable: $.QueryFiscalPayload.conteoUp
+                    NumericEqualsPath: $.GetResultsFromApi.resultados.up.votos
+                Next: SetStateToMatch
+            Default: SaveImageToS3
+          SaveImageToS3:
+            Comment: Descarga la imagen desde los resultados provisorios y la guarda en S3
+            Type: Task
+            Resource: !GetAtt SaveImageToS3.Arn
+            TimeoutSeconds: ${self:functions.SaveImageToS3.timeout}
+            ResultPath: $.SaveImageToS3
+            Next: ExtractVotesNumbersFromImage
+          ExtractVotesNumbersFromImage:
+            Comment: Extrae unicamente la tabla de numeros del telegrama para facilitar el procesamiento OCRs
+            Type: Task
+            Resource: !GetAtt ExtractVotesNumbersFromImage.Arn
+            TimeoutSeconds: ${self:functions.ExtractVotesNumbersFromImage.timeout}
+            ResultPath: $.ExtractVotesNumbersFromImage
+            Next: InitializeOcrProcess
+          InitializeOcrProcess:
+            Type: Pass
+            Result:
+              count: 0
+              data:
+                lla: -1
+                up: -1
+                total: -1
+                blancos: -1
+                nulos: -1
+                impugnados: -1
+                recurridos: -1
+            ResultPath: $.ProcessImageOCR
+            Next: ProcessImageOCR
+          ProcessImageOCR:
+            Comment: Procesa la imagen con un OCR en el orden en que ha sido definidos por prioridad
+            Type: Task
+            Resource: !GetAtt ProcessImageOCR.Arn
+            TimeoutSeconds: ${self:functions.ProcessImageOCR.timeout}
+            ResultPath: $.ProcessImageOCR
+            Next: AreAllFieldsDetected
+          AreAllFieldsDetected:
+            Comment: ¿Se detectaron todos los campos del telegrama?
+            Type: Choice
+            Choices:
+              - Variable: $.ProcessImageOCR.extracted
+                BooleanEquals: true
+                Next: IsGovermentOcrEqualsToGovermentAPI
+            Default: DoWeHaveMoreOCRAvailable
+          DoWeHaveMoreOCRAvailable:
+            Comment: ¿Tenemos algun otro OCR disponible?
+            Type: Choice
+            Choices:
+              - Variable: $.ProcessImageOCR.wasted
+                BooleanEquals: false
+                Next: ProcessImageOCR
+            Default: SetStateToNotProcessed
+          IsGovermentOcrEqualsToGovermentAPI:
+            Comment: ¿Los datos extraidos del telegrama (gob) es igual a los datos publicados en resultados?
+            Type: Choice
+            Choices:
+              - And:
+                  - Variable: $.QueryFiscalPayload.conteoLla
+                    NumericEqualsPath: $.GetResultsFromApi.resultados.lla.votos
+                  - Variable: $.QueryFiscalPayload.conteoUp
+                    NumericEqualsPath: $.GetResultsFromApi.resultados.up.votos
+                Next: DoWeHaveFiscalData2
+            Default: SetStateToFraudDetected
+          DoWeHaveFiscalData2:
+            Comment: ¿Tenemos data del fiscal recibida (2)?
+            Type: Choice
+            Choices:
+              - Variable: $.QueryFiscalPayload.isAvailable
+                BooleanEquals: true
+                # posible falla en datos ingresados por fiscal (america verificacion manual)
+                Next: SetStateToIncongruent
+              - Variable: $.QueryFiscalPayload.isAvailable
+                BooleanEquals: false
+                # No tenemos forma de validar la incongruencia
+                Next: SetStateToInvalid
+          # DetectTextAwsTextract:
+          #   Comment: Hace uso de AWS Textract OCR para extraer los datos desde una imagen de telegrama
+          #   Type: Task
+          #   Resource: !GetAtt DetectTextAwsTextract.Arn
+          #   TimeoutSeconds: ${self:functions.DetectTextAwsTextract.timeout}
+          #   OutputPath: $.dataFromAwsTextract
+          #   Next: Succeed
+          SetStateToIncongruent:
+            Type: Pass
+            Result:
+              state: INCONGRUENT
+              message: OCR gobierno es igual a datos publicados pero no es igual a lo que publico el fiscal
+            ResultPath: $.state
+            Next: SaveRecordToDatabase
+          SetStateToInvalid:
+            Type: Pass
+            Result:
+              state: INVALID
+              message: OCR gobierno es igual a datos publicados pero no tenemos datos del fiscal para comparar
+            ResultPath: $.state
+            Next: SaveRecordToDatabase
+          SetStateToFraudDetected:
+            Type: Pass
+            Result:
+              state: FRAUD_DETECTED
+              message: El OCR del gobierno no coincide con los resultados publicados
+            ResultPath: $.state
+            Next: SaveRecordToDatabase
+          SetStateToNotProcessed:
+            Type: Pass
+            Result:
+              state: NOT_PROCESSED
+              message: Los OCRs no pudieron extraer todos los numeros del telegrama
+            ResultPath: $.state
+            Next: SaveRecordToDatabase
+          SetStateToMatch:
+            Type: Pass
+            Result:
+              state: MATCH
+              message: Los numeros del fiscal coinciden a los resultados publicados
+            ResultPath: $.state
+            Next: SaveRecordToDatabase
+          SetStateToInconsistent:
+            Type: Pass
+            Result:
+              state: INCONSISTENT
+              message: La sumatoria total de votos no coincide con el total de votos
+            ResultPath: $.state
+            Next: SaveRecordToDatabase
+          SaveRecordToDatabase:
+            Comment: Guarda el resultado final del procesamiento de la mesa en db
+            Type: Task
+            Resource: !GetAtt SaveRecordToDatabase.Arn
+            TimeoutSeconds: ${self:functions.SaveRecordToDatabase.timeout}
+            Next: Succeed
+          Succeed:
+            Type: Succeed
